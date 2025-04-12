@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "45122278899",
+    "project_id": "esculpo",
+    "storage_bucket": "esculpo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45122278899:android:59d51de8e008f31776ee86",
+        "android_client_info": {
+          "package_name": "albertobezerra.esculpo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4eZsYI8Crvclos22Z7NOYzvuqRpwv60s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
