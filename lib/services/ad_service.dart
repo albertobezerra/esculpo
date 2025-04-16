@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'subscription_service.dart';
-import 'webview_test_screen.dart';
+import 'package:guarda_corpo_2024/screens/subscription_service.dart';
+import '../screens/webview_test_screen.dart';
 
 final adProvider = Provider((ref) => AdService());
 
@@ -39,8 +39,6 @@ class AdService {
 
   void dispose() {
     bannerAd?.dispose();
-    bannerAd = null;
-    isBannerLoaded = false;
   }
 }
 
@@ -68,7 +66,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final adService = ref.watch(adProvider);
     final userId = FirebaseAuth.instance.currentUser!.uid;
-    final isPremiumAsync = ref.watch(subscriptionProvider).isPremium(userId);
+    final isPremium = ref.watch(subscriptionProvider).isPremium(userId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Esculpo')),
@@ -126,18 +124,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           StreamBuilder<bool>(
-            stream: isPremiumAsync,
+            stream: isPremium,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox();
-              }
-              if (snapshot.hasError) {
-                debugPrint('Erro no isPremium: ${snapshot.error}');
-                return const SizedBox();
-              }
               if (snapshot.data == true || !adService.isBannerLoaded) {
-                debugPrint(
-                    'Banner não exibido: premium=${snapshot.data}, loaded=${adService.isBannerLoaded}');
                 return const SizedBox();
               }
               debugPrint('Exibindo banner: ${adService.bannerAd}');
