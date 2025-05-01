@@ -1,0 +1,2 @@
+C:/Apps/esculpo/esculpo/android/app/.cxx/Debug/43xk6y5n/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Apps/esculpo/esculpo/android/app/.cxx/Debug/43xk6y5n/armeabi-v7a/CMakeFiles/rebuild_cache.dir

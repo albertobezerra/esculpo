@@ -1,0 +1,2 @@
+C:/Apps/esculpo/esculpo/android/app/.cxx/Debug/43xk6y5n/x86/CMakeFiles/edit_cache.dir
+C:/Apps/esculpo/esculpo/android/app/.cxx/Debug/43xk6y5n/x86/CMakeFiles/rebuild_cache.dir

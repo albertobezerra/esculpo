@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:guarda_corpo_2024/screens/subscription_service.dart';
-import '../screens/webview_test_screen.dart';
+import 'package:guarda_corpo_2024/services/subscription_service.dart';
 
 final adProvider = Provider((ref) => AdService());
 
@@ -110,15 +109,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: const Text('Assinatura'),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const WebViewTestScreen()));
-                    },
-                    child: const Text('Testar WebView'),
-                  ),
                 ],
               ),
             ),
