@@ -1,187 +1,197 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/subscription_service.dart';
-import 'tela_treino.dart';
-import 'tela_exercicios.dart';
 import 'tela_planos_treino.dart';
 import 'tela_historico_treinos.dart';
+import 'tela_exercicios.dart';
+import 'tela_treino.dart';
 
-final adProvider = Provider((ref) => AdService());
-
-class AdService {
-  BannerAd? bannerAd;
-  bool isBannerLoaded = false;
-
-  Future<void> loadBannerAd() async {
-    debugPrint('Iniciando carregamento do banner');
-    bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // ID de teste
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (_) {
-          isBannerLoaded = true;
-          debugPrint('Banner carregado');
-        },
-        onAdFailedToLoad: (ad, error) {
-          isBannerLoaded = false;
-          debugPrint('Erro no banner: $error');
-          ad.dispose();
-        },
-      ),
-    );
-    try {
-      await bannerAd!.load();
-      debugPrint('Banner load concluído');
-    } catch (e) {
-      debugPrint('Exceção ao carregar banner: $e');
-    }
-  }
-
-  void dispose() {
-    bannerAd?.dispose();
-    bannerAd = null;
-    isBannerLoaded = false;
-  }
-}
-
-class TelaInicial extends ConsumerStatefulWidget {
+class TelaInicial extends StatelessWidget {
   const TelaInicial({super.key});
 
   @override
-  ConsumerState<TelaInicial> createState() => _TelaInicialState();
-}
-
-class _TelaInicialState extends ConsumerState<TelaInicial> {
-  @override
-  void initState() {
-    super.initState();
-    ref.read(adProvider).loadBannerAd();
-  }
-
-  @override
-  void dispose() {
-    ref.read(adProvider).dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final adService = ref.watch(adProvider);
-    final userId = FirebaseAuth.instance.currentUser!.uid;
-    final isPremiumAsync = ref.watch(subscriptionProvider).isPremium(userId);
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.displayName ?? 'Usuário';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Esculpo')),
-      body: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Você tá ficando mais forte! 💪',
-                    style: TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TelaTreino()),
-                      );
-                    },
-                    child: const Text('Criar Treino'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TelaExercicios()),
-                      );
-                    },
-                    child: const Text('Ver Exercícios'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TelaHistoricoTreinos()),
-                      );
-                    },
-                    child: const Text('Histórico de Treinos'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TelaPlanosTreino()),
-                      );
-                    },
-                    child: const Text('Planos de Treino'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text('Tela de perfil ainda não implementada')),
-                      );
-                    },
-                    child: const Text('Perfil'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Tela de assinatura ainda não implementada')),
-                      );
-                    },
-                    child: const Text('Assinatura'),
-                  ),
-                ],
+      backgroundColor: const Color(0xFF2D3748), // Cinza Escuro
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cabeçalho com saudação
+              Text(
+                'Olá, $userName!',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'Pronto pra esculpir seu corpo hoje?',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFFD1D5DB), // Cinza Claro
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Card principal - Iniciar Treino
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TelaTreino()),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E3A8A), // Azul Escuro
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Treino do Dia',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Comece agora!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFFD1D5DB),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Icon(
+                        Icons.fitness_center,
+                        size: 40,
+                        color: Color(0xFFF97316), // Laranja Vivo
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Seções de navegação
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  children: [
+                    _buildNavigationCard(
+                      context,
+                      title: 'Planos de Treino',
+                      icon: Icons.calendar_today,
+                      color: const Color(0xFFF97316), // Laranja Vivo
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const TelaPlanosTreino()),
+                        );
+                      },
+                    ),
+                    _buildNavigationCard(
+                      context,
+                      title: 'Histórico',
+                      icon: Icons.history,
+                      color: const Color(0xFFF97316),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const TelaHistoricoTreinos()),
+                        );
+                      },
+                    ),
+                    _buildNavigationCard(
+                      context,
+                      title: 'Exercícios',
+                      icon: Icons.directions_run,
+                      color: const Color(0xFFF97316),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const TelaExercicios()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFFFF), // Branco
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 2),
             ),
-          ),
-          StreamBuilder<bool>(
-            stream: isPremiumAsync,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox();
-              }
-              if (snapshot.hasError) {
-                debugPrint('Erro no isPremium: ${snapshot.error}');
-                return const SizedBox();
-              }
-              if (snapshot.data == true || !adService.isBannerLoaded) {
-                debugPrint(
-                    'Banner não exibido: premium=${snapshot.data}, loaded=${adService.isBannerLoaded}');
-                return const SizedBox();
-              }
-              debugPrint('Exibindo banner: ${adService.bannerAd}');
-              return adService.bannerAd != null
-                  ? SizedBox(
-                      height: adService.bannerAd!.size.height.toDouble(),
-                      width: adService.bannerAd!.size.width.toDouble(),
-                      child: AdWidget(ad: adService.bannerAd!),
-                    )
-                  : const SizedBox();
-            },
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 40,
+              color: color,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3748),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

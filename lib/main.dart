@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/theme/app_theme.dart';
 import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
 import 'screens/tela_login.dart';
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Esculpo',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: AppTheme.theme, // Usa o tema definido em app_theme.dart
       home: const TelaSplash(),
     );
   }
