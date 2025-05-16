@@ -12,9 +12,22 @@ class TelaSplash extends StatefulWidget {
 class _TelaSplashState extends State<TelaSplash> {
   // Lista de imagens (substitua pelos caminhos das suas imagens)
   final List<String> backgroundImages = [
-    'assets/images/fitness1.jpg',
-    'assets/images/fitness2.jpg',
-    'assets/images/fitness3.jpg',
+    'assets/images/splash1.jpg',
+    'assets/images/splash2.jpg',
+    'assets/images/splash3.jpg',
+    'assets/images/splash4.jpg',
+    'assets/images/splash5.jpg',
+    'assets/images/splash6.jpg',
+    'assets/images/splash7.jpg',
+    'assets/images/splash8.jpg',
+    'assets/images/splash9.jpg',
+    'assets/images/splash10.jpg',
+    'assets/images/splash11.jpg',
+    'assets/images/splash12.jpg',
+    'assets/images/splash13.jpg',
+    'assets/images/splash14.jpg',
+    'assets/images/splash15.jpg',
+    'assets/images/splash16.jpg',
   ];
 
   // Seleciona uma imagem aleatória
@@ -26,7 +39,7 @@ class _TelaSplashState extends State<TelaSplash> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -46,48 +59,6 @@ class _TelaSplashState extends State<TelaSplash> {
           Image.asset(
             getRandomImage(),
             fit: BoxFit.cover,
-          ),
-          // Gradiente escuro na parte inferior
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black54,
-                ],
-              ),
-            ),
-          ),
-          // Frase de impacto e loading
-          const Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 32.0),
-                child: Text(
-                  'Forja teu corpo, esculpe teu futuro.',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black45,
-                        offset: Offset(1, 1),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF97316)),
-              ),
-              SizedBox(height: 20),
-            ],
           ),
         ],
       ),
