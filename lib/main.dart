@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
+
 import 'screens/tela_login.dart';
 import 'screens/tela_splash.dart';
 
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Esculpo',
-      theme: AppTheme.theme, // Usa o tema definido em app_theme.dart
+      theme: AppTheme.theme,
       home: const TelaSplash(),
     );
   }
@@ -59,7 +60,7 @@ class AuthWrapper extends ConsumerWidget {
             },
           );
         }
-        return TelaLogin();
+        return const TelaLogin();
       },
     );
   }
