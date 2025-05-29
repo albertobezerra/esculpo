@@ -13,7 +13,6 @@ class _TelaLoginState extends State<TelaLogin> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoginMode = true;
   bool _isLoading = false;
 
   @override
@@ -31,31 +30,40 @@ class _TelaLoginState extends State<TelaLogin> {
     });
 
     try {
-      if (_isLoginMode) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-        // Nome e outros dados serão coletados no onboarding
-      }
+      // Tenta fazer login
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
     } on FirebaseAuthException catch (e) {
-      String message;
       if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        message = 'Email ou senha incorretos.';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'Este email já está em uso.';
+        // Se o usuário não existe ou a senha está errada, tenta criar uma nova conta
+        try {
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+        } on FirebaseAuthException catch (createError) {
+          String message;
+          if (createError.code == 'email-already-in-use') {
+            message = 'Este email já está em uso. Tente redefinir sua senha.';
+          } else {
+            message = 'Erro ao criar conta: ${createError.message}';
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+          }
+        }
       } else {
-        message = 'Erro: ${e.message}';
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        // Outros erros de login
+        String message = 'Erro ao fazer login: ${e.message}';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -68,6 +76,50 @@ class _TelaLoginState extends State<TelaLogin> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('Por favor, insira seu email para redefinir a senha')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Email de redefinição de senha enviado! Verifique sua caixa de entrada.')),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      if (e.code == 'invalid-email') {
+        message = 'Email inválido. Por favor, verifique o email inserido.';
+      } else if (e.code == 'user-not-found') {
+        message = 'Nenhum usuário encontrado com este email.';
+      } else {
+        message = 'Erro ao enviar email de redefinição: ${e.message}';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
       }
     }
   }
@@ -116,7 +168,7 @@ class _TelaLoginState extends State<TelaLogin> {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: MainAxisSize.min, // Corrigido de MainSize
                     children: [
                       Image.asset(
                         'assets/images/logo.png',
@@ -137,12 +189,13 @@ class _TelaLoginState extends State<TelaLogin> {
               ),
               child: Column(
                 children: [
-                  // Título "Login" ou "Cadastro"
+                  SizedBox(height: screenHeight * 0.02),
+                  // Título unificado
                   Text(
-                    _isLoginMode ? 'LOGIN' : 'CADASTRO',
+                    'LOGIN/CADASTRO',
                     style: GoogleFonts.bebasNeue(
                       fontSize: 32,
-                      color: const Color(0xFF9D291A),
+                      color: Colors.white,
                     ),
                   ),
                   SizedBox(height: screenHeight * 0.02),
@@ -153,57 +206,111 @@ class _TelaLoginState extends State<TelaLogin> {
                     child: Form(
                       key: _formKey,
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisSize: MainAxisSize.min, // Corrigido de MainSize
                         children: [
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: InputDecoration(
-                              labelText: 'EMAIL',
-                              labelStyle: GoogleFonts.bebasNeue(
-                                color: const Color(0xFF9D291A),
-                                fontSize: 18,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              textSelectionTheme: TextSelectionThemeData(
+                                cursorColor: const Color(0xFFF5F5F0),
+                                selectionColor: const Color(0xFFF5F5F0)
+                                    .withValues(
+                                        alpha: 0.3), // Corrigido withOpacity
+                                selectionHandleColor: const Color(0xFFF5F5F0),
                               ),
                             ),
-                            style: const TextStyle(color: Color(0xFF4A4A4A)),
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Por favor, insira seu email';
-                              }
-                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                                  .hasMatch(value)) {
-                                return 'Por favor, insira um email válido';
-                              }
-                              return null;
-                            },
+                            child: TextFormField(
+                              controller: _emailController,
+                              decoration: InputDecoration(
+                                labelText: 'EMAIL',
+                                labelStyle: GoogleFonts.bebasNeue(
+                                  color:
+                                      const Color(0xFFF5F5F0), // Branco Creme
+                                  fontSize: 18,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFF5F5F0), // Bordas brancas
+                                    width: 2,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFF5F5F0), // Bordas brancas
+                                    width: 2,
+                                  ),
+                                ),
+                                filled: true, // Habilita preenchimento
+                                fillColor:
+                                    Colors.transparent, // Fundo transparente
+                              ),
+                              style: const TextStyle(
+                                  color: Color(0xFFF5F5F0)), // Texto branco
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Por favor, insira seu email';
+                                }
+                                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                                    .hasMatch(value)) {
+                                  return 'Por favor, insira um email válido';
+                                }
+                                return null;
+                              },
+                            ),
                           ),
                           SizedBox(height: screenHeight * 0.02),
-                          TextFormField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'SENHA',
-                              labelStyle: GoogleFonts.bebasNeue(
-                                color: const Color(0xFF9D291A),
-                                fontSize: 18,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              textSelectionTheme: TextSelectionThemeData(
+                                cursorColor: const Color(0xFFF5F5F0),
+                                selectionColor: const Color(0xFFF5F5F0)
+                                    .withValues(
+                                        alpha: 0.3), // Corrigido withOpacity
+                                selectionHandleColor: const Color(0xFFF5F5F0),
                               ),
                             ),
-                            style: const TextStyle(color: Color(0xFF4A4A4A)),
-                            obscureText: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Por favor, insira sua senha';
-                              }
-                              if (value.length < 6) {
-                                return 'A senha deve ter pelo menos 6 caracteres';
-                              }
-                              return null;
-                            },
+                            child: TextFormField(
+                              controller: _passwordController,
+                              decoration: InputDecoration(
+                                labelText: 'SENHA',
+                                labelStyle: GoogleFonts.bebasNeue(
+                                  color:
+                                      const Color(0xFFF5F5F0), // Branco Creme
+                                  fontSize: 18,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFF5F5F0), // Bordas brancas
+                                    width: 2,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFF5F5F0), // Bordas brancas
+                                    width: 2,
+                                  ),
+                                ),
+                                filled: true, // Habilita preenchimento
+                                fillColor:
+                                    Colors.transparent, // Fundo transparente
+                              ),
+                              style: const TextStyle(
+                                  color: Color(0xFFF5F5F0)), // Texto branco
+                              obscureText: true,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Por favor, insira sua senha';
+                                }
+                                if (value.length < 6) {
+                                  return 'A senha deve ter pelo menos 6 caracteres';
+                                }
+                                return null;
+                              },
+                            ),
                           ),
                           SizedBox(height: screenHeight * 0.03),
                           _isLoading
@@ -213,31 +320,21 @@ class _TelaLoginState extends State<TelaLogin> {
                                 )
                               : GestureDetector(
                                   onTap: _submit,
-                                  child: SizedBox(
+                                  child: const SizedBox(
                                     width: 60,
                                     height: 60,
                                     child: Icon(
-                                      _isLoginMode
-                                          ? Icons.arrow_circle_right_outlined
-                                          : Icons.check_circle,
-                                      color: const Color(0xFFF5F5F0),
-                                      size: 30,
+                                      Icons.arrow_circle_right_outlined,
+                                      color: Color(0xFFF5F5F0),
+                                      size: 70,
                                     ),
                                   ),
                                 ),
-                          SizedBox(height: screenHeight * 0.02),
+                          SizedBox(height: screenHeight * 0.04),
                           TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLoginMode = !_isLoginMode;
-                                _emailController.clear();
-                                _passwordController.clear();
-                              });
-                            },
+                            onPressed: _resetPassword,
                             child: Text(
-                              _isLoginMode
-                                  ? 'AINDA NÃO TENHO CADASTRO'
-                                  : 'JÁ TENHO CADASTRO',
+                              'ESQUECI A SENHA',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
