@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Adiciona o Firestore
 import 'package:google_fonts/google_fonts.dart';
 
 class TelaLogin extends StatefulWidget {
@@ -41,10 +42,21 @@ class _TelaLoginState extends State<TelaLogin> {
           e.code == 'wrong-password' ||
           e.code == 'invalid-credential') {
         try {
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          // Cria a conta no Firebase Authentication
+          UserCredential userCredential =
+              await FirebaseAuth.instance.createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
+
+          // Cria um documento inicial no Firestore pra esse usuário
+          String userId = userCredential.user!.uid;
+          await FirebaseFirestore.instance.collection('users').doc(userId).set({
+            'email': _emailController.text.trim(),
+            'createdAt': Timestamp.now(),
+            // Campos iniciais (podem ser expandidos conforme necessário)
+          }, SetOptions(merge: true));
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Conta criada com sucesso!')),
