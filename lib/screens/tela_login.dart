@@ -36,17 +36,28 @@ class _TelaLoginState extends State<TelaLogin> {
         password: _passwordController.text.trim(),
       );
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        // Se o usuário não existe ou a senha está errada, tenta criar uma nova conta
+      // Se falhar o login, tenta criar uma conta em mais cenários
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
         try {
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Conta criada com sucesso!')),
+            );
+          }
         } on FirebaseAuthException catch (createError) {
           String message;
           if (createError.code == 'email-already-in-use') {
             message = 'Este email já está em uso. Tente redefinir sua senha.';
+          } else if (createError.code == 'invalid-email') {
+            message = 'Email inválido. Por favor, verifique o email inserido.';
+          } else if (createError.code == 'weak-password') {
+            message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
           } else {
             message = 'Erro ao criar conta: ${createError.message}';
           }
@@ -58,7 +69,14 @@ class _TelaLoginState extends State<TelaLogin> {
         }
       } else {
         // Outros erros de login
-        String message = 'Erro ao fazer login: ${e.message}';
+        String message;
+        if (e.code == 'invalid-email') {
+          message = 'Email inválido. Por favor, verifique o email inserido.';
+        } else if (e.code == 'too-many-requests') {
+          message = 'Muitas tentativas. Tente novamente mais tarde.';
+        } else {
+          message = 'Erro ao fazer login: ${e.message}';
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message)),
@@ -68,7 +86,7 @@ class _TelaLoginState extends State<TelaLogin> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
+          SnackBar(content: Text('Erro inesperado: $e')),
         );
       }
     } finally {
@@ -168,7 +186,7 @@ class _TelaLoginState extends State<TelaLogin> {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min, // Corrigido de MainSize
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
                         'assets/images/logo.png',
@@ -206,15 +224,14 @@ class _TelaLoginState extends State<TelaLogin> {
                     child: Form(
                       key: _formKey,
                       child: Column(
-                        mainAxisSize: MainAxisSize.min, // Corrigido de MainSize
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Theme(
                             data: Theme.of(context).copyWith(
                               textSelectionTheme: TextSelectionThemeData(
                                 cursorColor: const Color(0xFFF5F5F0),
                                 selectionColor: const Color(0xFFF5F5F0)
-                                    .withValues(
-                                        alpha: 0.3), // Corrigido withOpacity
+                                    .withValues(alpha: 0.3),
                                 selectionHandleColor: const Color(0xFFF5F5F0),
                               ),
                             ),
@@ -266,8 +283,7 @@ class _TelaLoginState extends State<TelaLogin> {
                               textSelectionTheme: TextSelectionThemeData(
                                 cursorColor: const Color(0xFFF5F5F0),
                                 selectionColor: const Color(0xFFF5F5F0)
-                                    .withValues(
-                                        alpha: 0.3), // Corrigido withOpacity
+                                    .withValues(alpha: 0.3),
                                 selectionHandleColor: const Color(0xFFF5F5F0),
                               ),
                             ),
