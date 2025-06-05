@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
-
 import 'screens/tela_login.dart';
 import 'screens/tela_splash.dart';
 
@@ -25,6 +24,12 @@ class MyApp extends StatelessWidget {
       title: 'Esculpo',
       theme: AppTheme.theme,
       home: const TelaSplash(),
+      // Adiciona rotas pra navegação
+      routes: {
+        '/tela_login': (context) => const TelaLogin(),
+        '/tela_onboarding': (context) => const TelaOnboarding(),
+        '/tela_inicial': (context) => const TelaInicial(),
+      },
     );
   }
 }
@@ -46,15 +51,16 @@ class AuthWrapper extends ConsumerWidget {
             future: FirebaseFirestore.instance
                 .collection('users')
                 .doc(userId)
-                .collection('onboarding')
-                .doc('data')
                 .get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasData && snapshot.data!.exists) {
-                return const TelaInicial();
+                final data = snapshot.data!.data() as Map<String, dynamic>?;
+                if (data != null && data['onboardingCompleted'] == true) {
+                  return const TelaInicial();
+                }
               }
               return const TelaOnboarding();
             },
