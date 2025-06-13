@@ -70,6 +70,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
 
   void _nextPage() {
     if (_currentPage < 14) {
+      // Limita o avanço até o slide 14
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -123,6 +124,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
+        debugPrint('Iniciando salvamento no Firebase...');
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': _nameController.text.trim(),
           'birthDate': _birthDate,
@@ -140,14 +142,17 @@ class _TelaOnboardingState extends State<TelaOnboarding>
           'restrictions': _restrictions,
           'onboardingCompleted': true,
         }, SetOptions(merge: true));
+        debugPrint('Salvamento no Firebase concluído.');
 
         await user.updateDisplayName(_nameController.text.trim());
 
         if (mounted) {
+          debugPrint('Navegando para TelaInicial...');
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const TelaInicial()),
           );
+          debugPrint('Navegação concluída.');
         }
       } catch (e) {
         debugPrint('Erro ao salvar no Firebase ou navegar: $e');
@@ -177,7 +182,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
               Column(
                 children: [
                   LinearProgressIndicator(
-                    value: (_currentPage + 1) / 15, // Ajustado pra 15 slides
+                    value: (_currentPage + 1) / 15,
                     backgroundColor: const Color.fromRGBO(255, 255, 255, 0.3),
                     valueColor:
                         const AlwaysStoppedAnimation<Color>(Color(0xFFF5F5F0)),
@@ -973,7 +978,12 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                 setState(() {
                                   _restrictions = value;
                                 });
-                                _nextPage();
+                                if (_restrictions != null) {
+                                  _pageController.nextPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  ); // Avança pro slide 15 (resumo)
+                                }
                               },
                               style: GoogleFonts.bebasNeue(
                                 color: const Color(0xFFF5F5F0),
