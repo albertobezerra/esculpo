@@ -49,6 +49,8 @@ dependencies:
   flutter_localization: ^0.3.2
   flutter_localizations:
     sdk: flutter
+  syncfusion_flutter_gauges: ^29.2.10
+  easy_date_timeline: ^2.0.9
 
 dev_dependencies:
   flutter_test:
