@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:easy_date_timeline/easy_date_timeline.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
 import 'tela_planos_treino.dart';
 import 'tela_historico_treinos.dart';
@@ -24,6 +23,25 @@ class _TelaInicialState extends State<TelaInicial> {
     const TelaExercicios(),
   ];
   bool hasNotification = false; // Simulação de notificação
+  DateTime _focusedDay = DateTime.now();
+
+  // Dados fictícios de treino e porcentagem por dia (usando apenas data, sem horário)
+  final Map<DateTime, Map<String, dynamic>> _events = {
+    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1):
+        {
+      'treino': 'Cardio',
+      'porcentagem': 75.0,
+    },
+    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day): {
+      'treino': 'Força',
+      'porcentagem': 100.0,
+    },
+    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 1):
+        {
+      'treino': 'Flexibilidade',
+      'porcentagem': 0.0,
+    },
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +79,7 @@ class _TelaInicialState extends State<TelaInicial> {
                   const CircleAvatar(
                     radius: 30,
                     backgroundColor: Color(0xFFF97316),
-                    child: Icon(Icons.person, size: 40, color: Colors.white),
+                    child: Icon(Icons.person, size: 40, color: Colors.black),
                   ),
                   const SizedBox(width: 16),
                   Column(
@@ -176,12 +194,18 @@ class _TelaInicialState extends State<TelaInicial> {
                 ),
               ),
               const SizedBox(height: 16),
-              EasyDateTimeLine(
-                initialDate: now,
-                onDateChange: (selectedDate) {
-                  // Lógica ao mudar a data
-                },
-                activeColor: const Color(0xFFF97316),
+              SizedBox(
+                height: 160, // Altura fixa
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildDayCard(
+                        now.subtract(const Duration(days: 1)), Colors.grey),
+                    _buildDayCard(now, const Color(0xFFF97316)),
+                    _buildDayCard(
+                        now.add(const Duration(days: 1)), Colors.grey),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
               // Bloco 3: Gráficos
@@ -239,6 +263,75 @@ class _TelaInicialState extends State<TelaInicial> {
     );
   }
 
+  Widget _buildDayCard(DateTime date, Color backgroundColor) {
+    // Normaliza a data pra comparar apenas dia, mês e ano
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final event = _events.entries
+        .firstWhere(
+          (entry) =>
+              DateTime(entry.key.year, entry.key.month, entry.key.day) ==
+              normalizedDate,
+          orElse: () =>
+              MapEntry(DateTime(0), const {'treino': '', 'porcentagem': 0.0}),
+        )
+        .value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _focusedDay = date;
+          });
+        },
+        child: Container(
+          height: 160,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          padding:
+              const EdgeInsets.all(8.0), // Padding pra evitar bordas coladas
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: _focusedDay == date
+                ? Border.all(color: const Color(0xFFF97316), width: 2)
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Data no topo
+              Text(
+                '${date.day}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8), // Espaçamento
+              // Treino no centro, estilo título
+              Text(
+                event['treino'] ?? 'Sem treino',
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 4), // Espaçamento
+              // Porcentagem no final, estilo subtítulo
+              Text(
+                '${event['porcentagem'].toStringAsFixed(0)}%',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGauge(String title, double value, double maxValue, String label,
       String description) {
     return Column(
@@ -262,7 +355,8 @@ class _TelaInicialState extends State<TelaInicial> {
                   GaugeRange(
                     startValue: value,
                     endValue: maxValue,
-                    color: const Color(0xFFD9D9D9).withValues(alpha: 0.3),
+                    color: const Color(0xFFD9D9D9)
+                        .withAlpha(77), // 0.3 de opacidade
                   ),
                 ],
                 pointers: <GaugePointer>[
