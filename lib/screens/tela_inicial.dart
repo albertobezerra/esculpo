@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
 import 'tela_planos_treino.dart';
 import 'tela_historico_treinos.dart';
@@ -17,31 +18,14 @@ class TelaInicial extends StatefulWidget {
 class _TelaInicialState extends State<TelaInicial> {
   int _selectedIndex = 0;
   final List<Widget> _pages = [
-    const TelaInicial(), // Substituir por um widget único se possível
+    const SizedBox(), // Placeholder para evitar loop infinito
     const TelaPlanosTreino(),
     const TelaHistoricoTreinos(),
     const TelaExercicios(),
   ];
-  bool hasNotification = false; // Simulação de notificação
+  bool hasNotification = false;
   DateTime _focusedDay = DateTime.now();
-
-  // Dados fictícios de treino e porcentagem por dia (usando apenas data, sem horário)
-  final Map<DateTime, Map<String, dynamic>> _events = {
-    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1):
-        {
-      'treino': 'Cardio',
-      'porcentagem': 75.0,
-    },
-    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day): {
-      'treino': 'Força',
-      'porcentagem': 100.0,
-    },
-    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 1):
-        {
-      'treino': 'Flexibilidade',
-      'porcentagem': 0.0,
-    },
-  };
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +44,7 @@ class _TelaInicialState extends State<TelaInicial> {
       greeting = 'Boa noite';
     }
 
-    // Dados fictícios pra gráficos
+    // Dados fictícios para gráficos (substituir por dados reais)
     const double caloriesBurned = 300.0;
     const double weightLifted = 120.0;
     const double cardioTime = 25.0;
@@ -85,28 +69,11 @@ class _TelaInicialState extends State<TelaInicial> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        greeting,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black,
-                        ),
-                      ),
-                      Text(
-                        userName,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      Text(
-                        formattedDate,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                      ),
+                      Text(greeting, style: const TextStyle(fontSize: 16)),
+                      Text(userName,
+                          style: const TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text(formattedDate, style: const TextStyle(fontSize: 14)),
                     ],
                   ),
                   const Spacer(),
@@ -122,28 +89,22 @@ class _TelaInicialState extends State<TelaInicial> {
                         setState(() {
                           hasNotification = !hasNotification;
                         });
-                        // Lógica de notificação
                       },
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              // Bloco 1: Treino do Dia
-              const Text(
-                'HOJE É DIA DE TREINAR',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
+
+              // Treino do Dia
+              const Text('HOJE É DIA DE TREINAR',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const TelaTreino()),
+                    MaterialPageRoute(builder: (_) => const TelaTreino()),
                   );
                 },
                 child: Container(
@@ -152,50 +113,28 @@ class _TelaInicialState extends State<TelaInicial> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFD9D9D9),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'CARDIO',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.black,
-                        ),
-                      ),
+                      Text('CARDIO'),
                       SizedBox(height: 8),
-                      Text(
-                        'QUADRÍCEPS, GLUTÉOS E PANTURRILHAS',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
+                      Text('QUADRÍCEPS, GLUTÉOS E PANTURRILHAS',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
-              // Bloco 2: Calendário de Treinos
-              const Text(
-                'CALÉNDARIO DE TREINOS',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
+
+              // Calendário de Treinos
+              const Text('CALÉNDARIO DE TREINOS',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               SizedBox(
-                height: 160, // Altura fixa
+                height: 120,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -207,16 +146,12 @@ class _TelaInicialState extends State<TelaInicial> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 24),
-              // Bloco 3: Gráficos
-              const Text(
-                'PROGRESSO',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
+
+              // Progresso
+              const Text('PROGRESSO',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -240,7 +175,6 @@ class _TelaInicialState extends State<TelaInicial> {
             _selectedIndex = index;
           });
           if (index != 0) {
-            // Evita loop recriando TelaInicial
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => _pages[index]),
@@ -264,17 +198,9 @@ class _TelaInicialState extends State<TelaInicial> {
   }
 
   Widget _buildDayCard(DateTime date, Color backgroundColor) {
-    // Normaliza a data pra comparar apenas dia, mês e ano
     final normalizedDate = DateTime(date.year, date.month, date.day);
-    final event = _events.entries
-        .firstWhere(
-          (entry) =>
-              DateTime(entry.key.year, entry.key.month, entry.key.day) ==
-              normalizedDate,
-          orElse: () =>
-              MapEntry(DateTime(0), const {'treino': '', 'porcentagem': 0.0}),
-        )
-        .value;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -282,51 +208,80 @@ class _TelaInicialState extends State<TelaInicial> {
             _focusedDay = date;
           });
         },
-        child: Container(
-          height: 160,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          padding:
-              const EdgeInsets.all(8.0), // Padding pra evitar bordas coladas
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(12),
-            border: _focusedDay == date
-                ? Border.all(color: const Color(0xFFF97316), width: 2)
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Data no topo
-              Text(
-                '${date.day}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
+        child: FutureBuilder<QuerySnapshot>(
+          future: _firestore
+              .collection('usuarios') // Alterado de 'users' para 'usuarios'
+              .doc(userId)
+              .collection('treinos') // Alterado de 'workouts' para 'treinos'
+              .where(
+                  'dataCriacao', // Alterado de 'createdAt' para 'dataCriacao'
+                  isGreaterThanOrEqualTo: normalizedDate,
+                  isLessThan: normalizedDate.add(const Duration(days: 1)))
+              .get(),
+          builder: (context, snapshot) {
+            String treino = 'Sem treino';
+            double porcentagem = 0.0;
+
+            if (snapshot.connectionState == ConnectionState.done) {
+              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                final workout =
+                    snapshot.data!.docs.first.data() as Map<String, dynamic>?;
+
+                if (workout != null) {
+                  final exerciciosList =
+                      workout['treinos']?[0]?['exercicios'] as List<dynamic>? ??
+                          [];
+
+                  if (exerciciosList.isNotEmpty) {
+                    treino = exerciciosList[0]['nome'] ?? 'Treino';
+                  }
+
+                  int totalSeries = 0;
+                  int seriesConcluidas = 0;
+
+                  for (var ex in exerciciosList) {
+                    final series = (ex['series'] as num?)?.toInt() ?? 0;
+
+                    totalSeries += series;
+
+                    if (ex['concluido'] == true) {
+                      seriesConcluidas += series;
+                    }
+                  }
+
+                  porcentagem = totalSeries > 0
+                      ? (seriesConcluidas / totalSeries) * 100
+                      : 0.0;
+                }
+              }
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: _focusedDay == date
+                    ? Border.all(color: const Color(0xFFF97316), width: 2)
+                    : null,
               ),
-              const SizedBox(height: 8), // Espaçamento
-              // Treino no centro, estilo título
-              Text(
-                event['treino'] ?? 'Sem treino',
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Colors.black,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${date.day}',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(treino, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 4),
+                  Text('${porcentagem.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
               ),
-              const SizedBox(height: 4), // Espaçamento
-              // Porcentagem no final, estilo subtítulo
-              Text(
-                '${event['porcentagem'].toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -344,8 +299,8 @@ class _TelaInicialState extends State<TelaInicial> {
               RadialAxis(
                 minimum: 0,
                 maximum: maxValue,
-                showLabels: false, // Remove numerações
-                showTicks: false, // Remove marcadores com traços
+                showLabels: false,
+                showTicks: false,
                 ranges: <GaugeRange>[
                   GaugeRange(
                     startValue: 0,
@@ -355,8 +310,7 @@ class _TelaInicialState extends State<TelaInicial> {
                   GaugeRange(
                     startValue: value,
                     endValue: maxValue,
-                    color: const Color(0xFFD9D9D9)
-                        .withAlpha(77), // 0.3 de opacidade
+                    color: const Color(0xFFD9D9D9).withAlpha(77),
                   ),
                 ],
                 pointers: <GaugePointer>[
@@ -368,12 +322,8 @@ class _TelaInicialState extends State<TelaInicial> {
                   ),
                 ],
                 annotations: <GaugeAnnotation>[
-                  // Apenas o valor
                   GaugeAnnotation(
-                    widget: Text(
-                      label,
-                      style: const TextStyle(fontSize: 12, color: Colors.black),
-                    ),
+                    widget: Text(label, style: const TextStyle(fontSize: 12)),
                     angle: 90,
                     positionFactor: 0.5,
                   ),
@@ -383,11 +333,8 @@ class _TelaInicialState extends State<TelaInicial> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          description,
-          style: const TextStyle(fontSize: 12, color: Colors.black),
-          textAlign: TextAlign.center,
-        ),
+        Text(description,
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
       ],
     );
   }

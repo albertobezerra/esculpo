@@ -51,7 +51,10 @@ class _TelaLoginState extends State<TelaLogin> {
 
           // Cria um documento inicial no Firestore pra esse usuário
           String userId = userCredential.user!.uid;
-          await FirebaseFirestore.instance.collection('users').doc(userId).set({
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(userId)
+              .set({
             'email': _emailController.text.trim(),
             'createdAt': Timestamp.now(),
             // Campos iniciais (podem ser expandidos conforme necessário)

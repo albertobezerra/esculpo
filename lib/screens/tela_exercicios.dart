@@ -9,10 +9,11 @@ import 'tela_treino.dart';
 final exerciseProvider = Provider((ref) => ExerciseService());
 
 class ExerciseService {
-  Stream<List<Map<String, dynamic>>> getExercises({String? muscleGroupFilter}) {
-    Query query = FirebaseFirestore.instance.collection('exercises');
-    if (muscleGroupFilter != null && muscleGroupFilter.isNotEmpty) {
-      query = query.where('muscleGroup', isEqualTo: muscleGroupFilter);
+  Stream<List<Map<String, dynamic>>> getExercises(
+      {String? grupoMuscularFiltro}) {
+    Query query = FirebaseFirestore.instance.collection('exercicios');
+    if (grupoMuscularFiltro != null && grupoMuscularFiltro.isNotEmpty) {
+      query = query.where('grupoMuscular', isEqualTo: grupoMuscularFiltro);
     }
     return query.snapshots().map(
           (snapshot) => snapshot.docs.map((doc) {
@@ -20,20 +21,20 @@ class ExerciseService {
             if (data == null) {
               return {
                 'id': doc.id,
-                'name': 'Sem nome',
-                'muscleGroup': 'Desconhecido',
-                'level': 'Iniciante',
-                'description': '',
-                'videoUrl': '',
+                'nome': 'Sem nome',
+                'grupoMuscular': 'Desconhecido',
+                'nivel': 'Iniciante',
+                'descricao': '',
+                'urlVideo': '',
               };
             }
             return {
               'id': doc.id,
-              'name': data['name'] ?? 'Sem nome',
-              'muscleGroup': data['muscleGroup'] ?? 'Desconhecido',
-              'level': data['level'] ?? 'Iniciante',
-              'description': data['description'] ?? '',
-              'videoUrl': data['videoUrl'] ?? '',
+              'nome': data['nome'] ?? 'Sem nome',
+              'grupoMuscular': data['grupoMuscular'] ?? 'Desconhecido',
+              'nivel': data['nivel'] ?? 'Iniciante',
+              'descricao': data['descricao'] ?? '',
+              'urlVideo': data['urlVideo'] ?? '',
             };
           }).toList(),
         );
@@ -87,7 +88,7 @@ class _TelaExerciciosState extends ConsumerState<TelaExercicios> {
   @override
   Widget build(BuildContext context) {
     final exercisesStream = ref.watch(exerciseProvider).getExercises(
-          muscleGroupFilter: _selectedMuscleGroup,
+          grupoMuscularFiltro: _selectedMuscleGroup,
         );
     return Scaffold(
       appBar: AppBar(title: const Text('Exercícios')),
@@ -133,15 +134,16 @@ class _TelaExerciciosState extends ConsumerState<TelaExercicios> {
                     final ex = exercises[index];
                     return Card(
                       child: ListTile(
-                        title: Text(ex['name'] ?? 'Sem nome'),
+                        title: Text(ex['nome'] ?? 'Sem nome'),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                                'Grupo: ${ex['muscleGroup'] ?? 'Desconhecido'}'),
-                            Text('Nível: ${ex['level']}'),
-                            if (ex['description'].isNotEmpty)
-                              Text('Descrição: ${ex['description']}'),
+                                'Grupo: ${ex['grupoMuscular'] ?? 'Desconhecido'}'),
+                            Text('Nível: ${ex['nivel']}'),
+                            if ((ex['descricao'] as String?)?.isNotEmpty ==
+                                true)
+                              Text('Descrição: ${ex['descricao']}'),
                           ],
                         ),
                       ),

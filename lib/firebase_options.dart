@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -54,9 +51,19 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyA4eZsYI8Crvclos22Z7NOYzvuqRpwv60s',
-    appId: '1:45122278899:android:59d51de8e008f31776ee86',
+    appId: '1:45122278899:android:83a01adcbaaac24676ee86',
     messagingSenderId: '45122278899',
     projectId: 'esculpo',
     storageBucket: 'esculpo.firebasestorage.app',
   );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDNSXglVJ3sjKfdeDotZLNH_PS5SUXnLHw',
+    appId: '1:45122278899:ios:82b82963853b1e4a76ee86',
+    messagingSenderId: '45122278899',
+    projectId: 'esculpo',
+    storageBucket: 'esculpo.firebasestorage.app',
+    iosBundleId: 'com.example.esculpo',
+  );
+
 }

@@ -9,7 +9,8 @@ class TelaDetalheTreino extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final exercises = workout['exercises'] as List<dynamic>? ?? [];
+    final exercises =
+        workout['treinos']?[0]?['exercicios'] as List<dynamic>? ?? [];
     final createdAt = workout['createdAt'] as Timestamp?;
     final formattedDate = createdAt != null
         ? DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toDate())
@@ -22,9 +23,9 @@ class TelaDetalheTreino extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tempo estimado: ${workout['estimatedTime'] ?? 0} min'),
+            Text('Tempo estimado: ${workout['tempoEstimado'] ?? 0} min'),
             Text(
-                'Calorias estimadas: ${(workout['estimatedCalories'] ?? 0).toStringAsFixed(1)} kcal'),
+                'Calorias estimadas: ${(workout['caloriasEstimadas'] ?? 0).toStringAsFixed(1)} kcal'),
             const SizedBox(height: 16),
             const Text(
               'Exercícios:',
@@ -36,9 +37,9 @@ class TelaDetalheTreino extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final ex = exercises[index] as Map<String, dynamic>;
                   return ListTile(
-                    title: Text(ex['name'] as String),
+                    title: Text(ex['nome'] as String? ?? 'Nome não disponível'),
                     subtitle: Text(
-                      '${ex['sets']} séries, ${ex['reps']} reps, ${ex['weight']} kg (${ex['weightVariation']})',
+                      '${ex['series']} séries, ${ex['repeticoes']} reps, ${ex['cargaSugerida']} kg',
                     ),
                   );
                 },

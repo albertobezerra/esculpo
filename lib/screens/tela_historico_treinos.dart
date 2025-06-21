@@ -15,10 +15,10 @@ class TelaHistoricoTreinos extends StatelessWidget {
       appBar: AppBar(title: const Text('Histórico de Treinos')),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('users')
+            .collection('usuarios')
             .doc(userId)
-            .collection('workouts')
-            .orderBy('createdAt', descending: true)
+            .collection('treinos') // Alterado de 'workouts' para 'treinos'
+            .orderBy('dataCriacao', descending: true) // Campo renomeado
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -39,10 +39,11 @@ class TelaHistoricoTreinos extends StatelessWidget {
             itemCount: workouts.length,
             itemBuilder: (context, index) {
               final workout = workouts[index].data() as Map<String, dynamic>;
-              final exercises = workout['exercises'] as List<dynamic>? ?? [];
-              final createdAt = workout['createdAt'] as Timestamp?;
-              final formattedDate = createdAt != null
-                  ? DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toDate())
+              final exerciciosList =
+                  workout['treinos']?[0]?['exercicios'] as List<dynamic>? ?? [];
+              final dataCriacao = workout['dataCriacao'] as Timestamp?;
+              final formattedDate = dataCriacao != null
+                  ? DateFormat('dd/MM/yyyy HH:mm').format(dataCriacao.toDate())
                   : 'Data desconhecida';
 
               return Card(
@@ -50,7 +51,7 @@ class TelaHistoricoTreinos extends StatelessWidget {
                 child: ListTile(
                   title: Text('Treino - $formattedDate'),
                   subtitle: Text(
-                      'Exercícios: ${exercises.length} | Tempo: ${workout['estimatedTime'] ?? 0} min'),
+                      'Exercícios: ${exerciciosList.length} | Tempo: ${workout['tempoEstimado'] ?? 0} min'),
                   onTap: () {
                     Navigator.push(
                       context,

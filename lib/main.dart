@@ -9,10 +9,13 @@ import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
 import 'screens/tela_login.dart';
 import 'screens/tela_splash.dart';
+import 'firebase_options.dart'; // Certifique-se de ter isso gerado com flutterfire configure
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -33,7 +36,6 @@ class MyApp extends StatelessWidget {
       title: 'Esculpo',
       theme: AppTheme.theme,
       home: const TelaSplash(),
-      // Adiciona rotas pra navegação
       routes: {
         '/tela_login': (context) => const TelaLogin(),
         '/tela_onboarding': (context) => const TelaOnboarding(),
@@ -54,20 +56,27 @@ class AuthWrapper extends ConsumerWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return const Center(child: Text('Erro ao verificar autenticação'));
+        }
         if (snapshot.hasData) {
           final userId = snapshot.data!.uid;
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
-                .collection('users')
+                .collection('usuarios') // Ajustado pra 'usuarios'
                 .doc(userId)
                 .get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
+              if (snapshot.hasError) {
+                return const Center(
+                    child: Text('Erro ao carregar dados do usuário'));
+              }
               if (snapshot.hasData && snapshot.data!.exists) {
                 final data = snapshot.data!.data() as Map<String, dynamic>?;
-                if (data != null && data['onboardingCompleted'] == true) {
+                if (data != null && data['onboardingConcluido'] == true) {
                   return const TelaInicial();
                 }
               }

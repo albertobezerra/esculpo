@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:guarda_corpo_2024/screens/tela_exercicios.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/subscription_service.dart';
-import 'tela_exercicios.dart';
 
 final workoutProvider = Provider((ref) => WorkoutService());
 
@@ -15,21 +15,21 @@ class WorkoutService {
 
   Future<void> saveWorkout(String userId, Map<String, dynamic> workout) async {
     await _firestore
-        .collection('users')
+        .collection('usuarios') // Coleção alterada de 'users' para 'usuarios'
         .doc(userId)
-        .collection('workouts')
+        .collection('treinos') // Coleção alterada de 'workouts' para 'treinos'
         .add(workout);
   }
 
   Future<void> updateCompletedSets(String userId, int sets) async {
-    await _firestore.collection('users').doc(userId).update({
-      'completedSets': FieldValue.increment(sets),
+    await _firestore.collection('usuarios').doc(userId).update({
+      'seriesConcluidas': FieldValue.increment(sets),
     });
   }
 
   Future<Map<String, dynamic>?> getOnboardingData(String userId) async {
     final doc = await _firestore
-        .collection('users')
+        .collection('usuarios')
         .doc(userId)
         .collection('onboarding')
         .doc('data')
@@ -44,6 +44,7 @@ class InterstitialAdService {
   InterstitialAd? interstitialAd;
   bool isAdLoaded = false;
   DateTime? lastAdShownTime;
+
   static const int adCooldownSeconds = 0; // Desativado pra testes
 
   Future<void> loadInterstitialAd() async {
@@ -52,6 +53,7 @@ class InterstitialAdService {
       return;
     }
     debugPrint('Iniciando carregamento do interstitial');
+
     await InterstitialAd.load(
       adUnitId: 'ca-app-pub-3940256099942544/1033173712',
       request: const AdRequest(),
@@ -144,7 +146,7 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
   StreamSubscription<bool>? _premiumSubscription;
   Map<String, dynamic>? _onboardingData;
   int _estimatedTime = 0;
-  double _estimatedCalories = 0;
+  double _estimatedCalories = 0.0;
 
   @override
   void initState() {
@@ -160,7 +162,7 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
     final data = await ref.read(workoutProvider).getOnboardingData(
           FirebaseAuth.instance.currentUser!.uid,
         );
-    if (mounted) {
+    if (mounted && data != null) {
       setState(() => _onboardingData = data);
     }
   }
@@ -189,6 +191,7 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
       _isTimerRunning = true;
       _currentTime = _restTime;
     });
+
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!_isTimerRunning || !mounted) return false;
@@ -209,13 +212,15 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
   void _estimateWorkout() {
     int totalTime = 0;
     double totalCalories = 0;
-    final weight = _onboardingData?['weight']?.toDouble() ?? 70.0;
+    final weight = _onboardingData?['peso']?.toDouble() ?? 70.0;
+
     for (var ex in exercises) {
-      final sets = ex['sets'] as int? ?? 3;
-      final reps = ex['reps'] as int? ?? 12;
-      totalTime += sets * (reps * 3 + _restTime); // 3s por rep
+      final sets = ex['series'] as int? ?? 3;
+      final reps = ex['repeticoes'] as int? ?? 12;
+      totalTime += sets * (reps * 3 + _restTime); // 3s por repetição
       totalCalories += sets * reps * 0.5 * (weight / 70); // Estimativa
     }
+
     setState(() {
       _estimatedTime = totalTime ~/ 60;
       _estimatedCalories = totalCalories;
@@ -225,7 +230,7 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
   void _shareWorkout() {
     final summary = exercises
         .map((e) =>
-            "${e['name']}: ${e['sets']} séries, ${e['reps']} reps, ${e['weight']} kg${e['weightVariation'] != null ? ' (${e['weightVariation']})' : ''}")
+            "${e['nome']}: ${e['series']} séries, ${e['repeticoes']} reps, ${e['cargaSugerida']} kg${e['weightVariation'] != null ? ' (${e['weightVariation']})' : ''}")
         .join('\n');
     Share.share('Meu treino no Esculpo:\n$summary\n💪 #EsculpoApp');
   }
@@ -243,20 +248,23 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
         await workoutService.saveWorkout(
           FirebaseAuth.instance.currentUser!.uid,
           {
-            'exercises': exercises,
-            'createdAt': FieldValue.serverTimestamp(),
-            'estimatedTime': _estimatedTime,
-            'estimatedCalories': _estimatedCalories,
+            'exercicios': exercises,
+            'dataCriacao': FieldValue.serverTimestamp(),
+            'tempoEstimado': _estimatedTime,
+            'caloriasEstimadas': _estimatedCalories,
           },
         );
+
         if (_completedSets > 0) {
           await workoutService.updateCompletedSets(
               FirebaseAuth.instance.currentUser!.uid, _completedSets);
         }
+
         if (!isPremium && mounted) {
           interstitialAdService.showAd();
         }
       }
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -286,15 +294,15 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
   @override
   Widget build(BuildContext context) {
     final exercisesStream = ref.watch(exerciseProvider).getExercises();
-    final experienceLevel = _onboardingData?['experienceLevel'] ?? 'Iniciante';
-    final suggestedReps = experienceLevel == 'Iniciante'
+    final experienceLevel = _onboardingData?['experiencia'] ?? 'Iniciante';
+    final suggestedReps = experienceLevel == 'Sim, regularmente'
         ? 12
-        : experienceLevel == 'Intermediário'
+        : experienceLevel == 'Sim, >6 meses'
             ? 10
             : 8;
-    final suggestedWeightMultiplier = experienceLevel == 'Iniciante'
+    final suggestedWeightMultiplier = experienceLevel == 'Sim, regularmente'
         ? 0.5
-        : experienceLevel == 'Intermediário'
+        : experienceLevel == 'Sim, >6 meses'
             ? 0.7
             : 0.9;
 
@@ -324,15 +332,17 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                   return const Center(
                       child: Text('Erro ao carregar exercícios'));
                 }
-                final exerciseItems = snapshot.hasData &&
-                        snapshot.data!.isNotEmpty
-                    ? snapshot.data!
-                        .map((e) => DropdownMenuItem<String>(
-                              value: e['id'],
-                              child: Text((e['name'] ?? 'Sem nome') as String),
-                            ))
-                        .toList()
-                    : <DropdownMenuItem<String>>[];
+
+                final exerciseItems =
+                    snapshot.hasData && snapshot.data!.isNotEmpty
+                        ? snapshot.data!
+                            .map((e) => DropdownMenuItem<String>(
+                                  value: e['id'],
+                                  child: Text(e['nome'] ?? 'Sem nome'),
+                                ))
+                            .toList()
+                        : <DropdownMenuItem<String>>[];
+
                 return DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Exercício'),
                   value: _selectedExerciseId,
@@ -372,7 +382,11 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                   .map((muscle) =>
                       DropdownMenuItem(value: muscle, child: Text(muscle)))
                   .toList(),
-              onChanged: (value) => setState(() => _customMuscleGroup = value),
+              onChanged: (value) {
+                if (mounted) {
+                  setState(() => _customMuscleGroup = value);
+                }
+              },
             ),
             TextField(
               controller: _setsController,
@@ -394,17 +408,19 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
             Row(
               children: [
                 const Text('Descanso (s): '),
-                Slider(
-                  value: _restTime.toDouble(),
-                  min: 30,
-                  max: 180,
-                  divisions: 15,
-                  label: _restTime.toString(),
-                  onChanged: (value) {
-                    if (mounted) {
-                      setState(() => _restTime = value.round());
-                    }
-                  },
+                Expanded(
+                  child: Slider(
+                    value: _restTime.toDouble(),
+                    min: 30,
+                    max: 180,
+                    divisions: 15,
+                    label: _restTime.toString(),
+                    onChanged: (value) {
+                      if (mounted) {
+                        setState(() => _restTime = value.round());
+                      }
+                    },
+                  ),
                 ),
               ],
             ),
@@ -415,10 +431,10 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                   exerciseName = _customExerciseController.text;
                 } else if (_selectedExerciseId != null) {
                   final doc = await FirebaseFirestore.instance
-                      .collection('exercises')
+                      .collection('exercicios')
                       .doc(_selectedExerciseId)
                       .get();
-                  exerciseName = doc.data()?['name'] as String?;
+                  exerciseName = doc.data()?['nome'] as String?;
                 }
 
                 if (exerciseName == null) {
@@ -427,8 +443,8 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                       const SnackBar(
                           content: Text('Selecione ou insira um exercício')),
                     );
+                    return;
                   }
-                  return;
                 }
 
                 final sets = int.tryParse(_setsController.text) ?? 3;
@@ -445,14 +461,15 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                 final exercise = {
                   'id': _selectedExerciseId ??
                       'custom_${DateTime.now().millisecondsSinceEpoch}',
-                  'name': exerciseName,
-                  'muscleGroup': _customMuscleGroup ?? 'Desconhecido',
-                  'sets': sets,
-                  'reps': reps,
-                  'weight': weight,
+                  'nome': exerciseName,
+                  'grupoMuscular': _customMuscleGroup ?? 'Desconhecido',
+                  'series': sets,
+                  'repeticoes': reps,
+                  'cargaSugerida': weight,
                   'suggestedWeight': suggestedWeight,
                   'weightVariation': weightVariation,
                 };
+
                 setState(() {
                   exercises.add(exercise);
                   _selectedExerciseId = null;
@@ -476,28 +493,28 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
                 itemBuilder: (context, index) {
                   final ex = exercises[index];
                   return ListTile(
-                    title: Text(ex['name'] as String),
+                    title: Text(ex['nome'] as String),
                     subtitle: Text(
-                      '${ex['sets']} séries, ${ex['reps']} reps, ${ex['weight']} kg (${ex['weightVariation']})',
+                      '${ex['series']} séries, ${ex['repeticoes']} reps, ${ex['cargaSugerida']} kg (${ex['weightVariation']})',
                     ),
                     trailing: IconButton(
                       icon: Icon(
-                        ex['completed'] == true
+                        ex['concluido'] == true
                             ? Icons.check_circle
                             : Icons.check,
                       ),
                       onPressed: () {
                         if (!mounted) return;
                         setState(() {
-                          final isCompleted = ex['completed'] == true;
-                          ex['completed'] = !isCompleted;
+                          final isCompleted = ex['concluido'] == true;
+                          ex['concluido'] = !isCompleted;
                           if (!isCompleted) {
-                            _completedSets += ex['sets'] as int;
+                            _completedSets += ex['series'] as int;
                           } else {
-                            _completedSets -= ex['sets'] as int;
+                            _completedSets -= ex['series'] as int;
                           }
                         });
-                        if (!_isTimerRunning && ex['completed'] == true) {
+                        if (!_isTimerRunning && ex['concluido'] == true) {
                           _startTimer();
                         }
                       },

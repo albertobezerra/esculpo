@@ -52,9 +52,10 @@ class _TelaPlanosTreinoState extends ConsumerState<TelaPlanosTreino> {
           Expanded(
             child: StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('users')
+                  .collection('usuarios') // Alterado de 'users' para 'usuarios'
                   .doc(userId)
-                  .collection('training_plans')
+                  .collection(
+                      'planos_treino') // Alterado de 'training_plans' para 'planos_treino'
                   .doc('personalized')
                   .snapshots(),
               builder: (context, snapshot) {
@@ -69,7 +70,8 @@ class _TelaPlanosTreinoState extends ConsumerState<TelaPlanosTreino> {
                 }
 
                 final plan = snapshot.data!.data() as Map<String, dynamic>;
-                final workouts = plan['workouts'] as List<dynamic>? ?? [];
+                final workouts = plan['treinos'] as List<dynamic>? ??
+                    []; // Alterado de 'workouts' para 'treinos'
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
@@ -79,9 +81,10 @@ class _TelaPlanosTreinoState extends ConsumerState<TelaPlanosTreino> {
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 8.0),
                       child: ListTile(
-                        title: Text(workout['name'] as String),
+                        title: Text(workout['titulo'] as String? ??
+                            'Sem título'), // Alterado de 'name' para 'titulo'
                         subtitle: Text(
-                            'Exercícios: ${(workout['exercises'] as List).length}'),
+                            'Exercícios: ${(workout['exercicios'] as List?)?.length ?? 0}'), // Alterado de 'exercises' para 'exercicios'
                         onTap: () {
                           Navigator.push(
                             context,
