@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
@@ -171,7 +172,7 @@ class _TelaInicialState extends State<TelaInicial> {
     return Theme(
       data: AppTheme.theme,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F5F0), // Fundo ajustado
+        backgroundColor: Colors.white, // Fundo ajustado
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -183,20 +184,24 @@ class _TelaInicialState extends State<TelaInicial> {
                   children: [
                     const CircleAvatar(
                       radius: 30,
-                      backgroundColor: Color(0xFFE07A5F),
-                      child: Icon(Icons.person,
-                          size: 40, color: Color(0xFF4A4A4A)),
+                      backgroundColor: Color(0xFF9D291A),
+                      child: Icon(Icons.person, size: 40, color: Colors.white),
                     ),
                     const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(greeting,
-                            style: AppTheme.theme.textTheme.bodyMedium),
-                        Text(userName,
-                            style: AppTheme.theme.textTheme.headlineLarge),
+                        Text(greeting.toUpperCase(),
+                            style: GoogleFonts.bebasNeue(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w600)),
+                        Text(userName.toUpperCase(),
+                            style: GoogleFonts.bebasNeue(
+                                color: const Color(0xFF9D291A), fontSize: 32)),
                         Text(formattedDate,
-                            style: AppTheme.theme.textTheme.bodySmall),
+                            style: GoogleFonts.bebasNeue(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w600)),
                       ],
                     ),
                     const Spacer(),
@@ -220,11 +225,11 @@ class _TelaInicialState extends State<TelaInicial> {
                 const SizedBox(height: 24),
 
                 // Treino do Dia
-                const Text('HOJE É DIA DE TREINAR',
-                    style: TextStyle(
+                Text('HOJE É DIA DE TREINAR'.toUpperCase(),
+                    style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF9D291A))), // Título ajustado
+                        color: Colors.black)), // Título ajustado
                 const SizedBox(height: 16),
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _getTodayWorkout(),
