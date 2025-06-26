@@ -128,6 +128,8 @@ class _TelaOnboardingState extends State<TelaOnboarding>
         await FirebaseFirestore.instance
             .collection('usuarios')
             .doc(user.uid)
+            .collection('onboarding')
+            .doc('data')
             .set({
           'nome': _nameController.text.trim(),
           'dataNascimento': _birthDate,

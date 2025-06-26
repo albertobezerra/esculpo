@@ -6,83 +6,109 @@ class PlanGeneratorService {
 
   Future<void> generateTrainingPlan(String userId, {int? customDays}) async {
     try {
+      debugPrint('Iniciando geração de plano para $userId...');
+
       // Carregar dados do onboarding
       final onboardingDoc = await _firestore
-          .collection('users')
+          .collection('usuarios')
           .doc(userId)
           .collection('onboarding')
           .doc('data')
           .get();
 
       if (!onboardingDoc.exists) {
+        debugPrint('Dados de onboarding não encontrados para $userId');
         throw Exception('Dados do onboarding não encontrados');
       }
 
       final onboardingData = onboardingDoc.data()!;
       final experienceLevel =
-          onboardingData['experienceLevel'] as String? ?? 'Iniciante';
+          onboardingData['experiencia'] as String? ?? 'Iniciante';
       final focusMuscleGroups = List<String>.from(
-          onboardingData['focusMuscleGroups'] ?? ['Peito', 'Costas', 'Pernas']);
-      final objectives =
-          List<String>.from(onboardingData['objectives'] ?? ['Força']);
+          onboardingData['preferencia'] ?? ['Peito', 'Costas', 'Pernas']);
+      final objective =
+          onboardingData['objetivo'] as String? ?? 'Ganho de Força';
+
+      debugPrint(
+          'Dados de onboarding carregados: experiencia=$experienceLevel, preferencia=$focusMuscleGroups, objetivo=$objective');
 
       // Sugerir dias com base no nível
       int suggestedDays;
       switch (experienceLevel) {
-        case 'Iniciante':
-          suggestedDays = 3;
+        case 'Sim, regularmente':
+          suggestedDays = 5;
           break;
-        case 'Intermediário':
+        case 'Sim, >6 meses':
           suggestedDays = 4;
           break;
-        case 'Avançado':
-          suggestedDays = 5;
+        case 'Sim, <6 meses':
+        case 'Não':
+          suggestedDays = 3;
           break;
         default:
           suggestedDays = 3;
       }
 
-      // Usar dias customizados, se fornecidos
-      final trainingFrequency = customDays ?? suggestedDays;
+      // Usar dias customizados, se fornecidos (até 7)
+      final trainingFrequency =
+          customDays != null && customDays <= 7 ? customDays : suggestedDays;
 
       // Carregar exercícios
-      final exercisesSnapshot = await _firestore.collection('exercises').get();
-      final exercises =
-          exercisesSnapshot.docs.map((doc) => doc.data()).toList();
+      final exercisesSnapshot = await _firestore.collection('exercicios').get();
+      if (exercisesSnapshot.docs.isEmpty) {
+        debugPrint('Nenhum exercício encontrado na coleção "exercicios"');
+        throw Exception('Nenhum exercício disponível para gerar o plano');
+      }
+      final exercises = exercisesSnapshot.docs.map((doc) {
+        return {
+          ...doc.data(),
+          'id': doc.id,
+          'type': _mapExerciseType(doc.data()),
+        };
+      }).toList();
+      debugPrint('Exercícios carregados: ${exercises.length} documentos');
 
-      // Filtrar exercícios com base em grupos musculares, nível e objetivos
+      // Filtrar exercícios
       final filteredExercises = exercises.where((ex) {
-        final muscleGroup = ex['muscleGroup'] as String?;
-        final level = ex['level'] as String?;
+        final muscleGroup = ex['grupoMuscular'] as String?;
+        final level = ex['nivel'] as String?;
         final exerciseType = ex['type'] as String? ?? 'Força';
-        return focusMuscleGroups.contains(muscleGroup) &&
-            (level == experienceLevel || level == 'Iniciante') &&
-            objectives.contains(exerciseType);
+        final isMatch = muscleGroup != null &&
+            focusMuscleGroups.contains(muscleGroup) &&
+            (level == 'Iniciante' ||
+                level == null ||
+                level == experienceLevel) &&
+            _matchesObjective(exerciseType, objective);
+        debugPrint(
+            'Exercício ${ex['nome']}: muscleGroup=$muscleGroup, level=$level, type=$exerciseType, match=$isMatch');
+        return isMatch;
       }).toList();
 
       if (filteredExercises.isEmpty) {
+        debugPrint(
+            'Nenhum exercício compatível encontrado com os filtros: $focusMuscleGroups, $experienceLevel, $objective');
         throw Exception('Nenhum exercício compatível encontrado');
       }
 
       // Configurações por nível
-      final sets = experienceLevel == 'Iniciante'
-          ? 3
-          : experienceLevel == 'Intermediário'
+      final sets = experienceLevel.contains('regularmente')
+          ? 5
+          : experienceLevel.contains('>6 meses')
               ? 4
-              : 5;
-      final reps = experienceLevel == 'Iniciante'
-          ? 12
-          : experienceLevel == 'Intermediário'
+              : 3;
+      final reps = experienceLevel.contains('regularmente')
+          ? 8
+          : experienceLevel.contains('>6 meses')
               ? 10
-              : 8;
-      final restTime = experienceLevel == 'Iniciante'
-          ? 60
-          : experienceLevel == 'Intermediário'
+              : 12;
+      final restTime = experienceLevel.contains('regularmente')
+          ? 30
+          : experienceLevel.contains('>6 meses')
               ? 45
-              : 30;
+              : 60;
 
       // Gerar treinos
-      final workouts = <Map<String, dynamic>>[];
+      final treinos = <Map<String, dynamic>>[];
       for (int i = 0; i < trainingFrequency; i++) {
         final selectedExercises = filteredExercises
             .asMap()
@@ -92,33 +118,33 @@ class PlanGeneratorService {
             .take(6)
             .map((entry) => {
                   'id': entry.value['id'],
-                  'name': entry.value['name'],
-                  'muscleGroup': entry.value['muscleGroup'],
-                  'sets': sets,
-                  'reps': reps,
-                  'weight': 0,
-                  'restTime': restTime,
+                  'nome': entry.value['nome'],
+                  'grupoMuscular': entry.value['grupoMuscular'],
+                  'series': sets,
+                  'repeticoes': reps,
+                  'cargaSugerida': 0,
+                  'tempoDescanso': restTime,
                 })
             .toList();
 
-        workouts.add({
-          'name': 'Treino ${String.fromCharCode(65 + i)}',
-          'exercises': selectedExercises,
+        treinos.add({
+          'nome': 'Treino ${String.fromCharCode(65 + i)}',
+          'exercicios': selectedExercises,
         });
       }
 
       // Salvar plano
       await _firestore
-          .collection('users')
+          .collection('usuarios')
           .doc(userId)
-          .collection('training_plans')
+          .collection('planos_treino')
           .doc('personalized')
           .set({
-        'name': 'Plano Personalizado',
-        'workouts': workouts,
-        'trainingFrequency': trainingFrequency,
-        'suggestedDays': suggestedDays,
-        'createdAt': FieldValue.serverTimestamp(),
+        'titulo': 'Plano Personalizado',
+        'treinos': treinos,
+        'frequenciaTreino': trainingFrequency,
+        'diasSugeridos': suggestedDays,
+        'dataCriacao': FieldValue.serverTimestamp(),
       });
 
       debugPrint(
@@ -127,5 +153,28 @@ class PlanGeneratorService {
       debugPrint('Erro ao gerar plano: $e');
       rethrow;
     }
+  }
+
+  // Mapeia o tipo de exercício com base nos dados
+  String _mapExerciseType(Map<String, dynamic> exercise) {
+    final name = exercise['nome'] as String? ?? '';
+    if (name.toLowerCase().contains('cardio') ||
+        name.toLowerCase().contains('corrida')) {
+      return 'Cardio';
+    }
+    return 'Força';
+  }
+
+  // Verifica se o tipo de exercício corresponde ao objetivo
+  bool _matchesObjective(String exerciseType, String objective) {
+    if (objective == 'Perder peso' &&
+        (exerciseType == 'Cardio' || exerciseType == 'Força')) {
+      return true;
+    }
+    if ((objective == 'Ganho de Força' || objective == 'Ganhar massa') &&
+        exerciseType == 'Força') {
+      return true;
+    }
+    return false;
   }
 }
