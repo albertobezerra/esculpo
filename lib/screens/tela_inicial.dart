@@ -456,7 +456,7 @@ class _TelaInicialState extends State<TelaInicial> {
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 120,
+                  height: 180,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -690,23 +690,29 @@ class _TelaInicialState extends State<TelaInicial> {
               ? Border.all(color: AppTheme.theme.colorScheme.primary, width: 2)
               : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${date.day}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(treino,
-                style: AppTheme.theme.textTheme.bodyMedium
-                    ?.copyWith(color: AppTheme.theme.colorScheme.onPrimary)),
-            const SizedBox(height: 4),
-            Text('${porcentagem.toStringAsFixed(0)}%',
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF9D291A))),
-          ],
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Center(
+                child: Text('${date.day}',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              //const SizedBox(height: 8),
+              Center(
+                child: Text(treino,
+                    style: AppTheme.theme.textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.theme.colorScheme.onPrimary)),
+              ),
+              Text('${porcentagem.toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF9D291A))),
+            ],
+          ),
         ),
       ),
     );
