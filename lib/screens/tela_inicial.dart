@@ -375,12 +375,12 @@ class _TelaInicialState extends State<TelaInicial> {
                   'HOJE É DIA DE TREINAR'.toUpperCase(),
                   style: GoogleFonts.bebasNeue(
                     fontSize: 20,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w800,
                     color: Colors.black,
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.only(top: 2),
                   child: FutureBuilder<Map<String, dynamic>?>(
                     future: _getActiveWorkout(now),
                     builder: (context, snapshot) {
@@ -411,25 +411,37 @@ class _TelaInicialState extends State<TelaInicial> {
                         },
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(20),
+                          height: 150,
                           decoration: BoxDecoration(
                             color: const Color(0xFF9D291A),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Stack(
+                            fit: StackFit
+                                .expand, // Garante que o Stack ocupe todo o espaço do Container
                             children: [
-                              Text(
-                                workout['musculos'],
-                                style: GoogleFonts.bebasNeue(
-                                  fontSize: 30,
-                                  color: Colors.white,
+                              // Texto posicionado exatamente na borda inferior
+                              Positioned(
+                                left: 20, // Mantém o padding esquerdo original
+                                bottom: 0, // Cola o texto à borda inferior
+                                child: Text(
+                                  workout['musculos'],
+                                  style: GoogleFonts.bebasNeue(
+                                    fontSize: 30,
+                                    color: Colors.white,
+                                  ),
+                                  overflow: TextOverflow
+                                      .ellipsis, // Trunca com "..." se exceder
+                                  maxLines: 1, // Limita a uma linha
                                 ),
                               ),
+                              // Botão condicional posicionado acima
                               if (workout['musculos'] ==
                                   'Nenhum plano de treino ativo'.toUpperCase())
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
+                                Positioned(
+                                  left: 20,
+                                  top:
+                                      20, // Ajuste para posicionar o botão acima
                                   child: ElevatedButton(
                                     onPressed: _showCreatePlanOptions,
                                     child: const Text('Criar Plano de Treino'),
