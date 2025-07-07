@@ -422,7 +422,7 @@ class _TelaInicialState extends State<TelaInicial> {
                             children: [
                               // Texto posicionado exatamente na borda inferior
                               Positioned(
-                                left: 20, // Mantém o padding esquerdo original
+                                left: 10, // Mantém o padding esquerdo original
                                 bottom: 0, // Cola o texto à borda inferior
                                 child: Text(
                                   workout['musculos'],
