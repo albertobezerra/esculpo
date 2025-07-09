@@ -28,7 +28,6 @@ class _TelaInicialState extends State<TelaInicial> {
     const TelaExercicios(),
   ];
   bool hasNotification = false;
-  DateTime _focusedDay = DateTime.now();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
   final PlanGeneratorService _planGenerator = PlanGeneratorService();
@@ -220,7 +219,9 @@ class _TelaInicialState extends State<TelaInicial> {
         'createdAt': FieldValue.serverTimestamp(),
         'tempoEstimado': tempoEstimado,
         'caloriasEstimadas': caloriasEstimadas,
-        'tipo': treino['nome'] ?? 'Treino',
+        'tipo': exercicios.isNotEmpty
+            ? exercicios[0]['grupoMuscular'] ?? 'Treino'
+            : 'Treino', // Usa grupoMuscular como nome
         'musculos': musculosList.isNotEmpty
             ? musculosList.join(', ').toUpperCase()
             : 'Sem informações de músculos'.toUpperCase(),
@@ -375,7 +376,7 @@ class _TelaInicialState extends State<TelaInicial> {
                   'HOJE É DIA DE TREINAR'.toUpperCase(),
                   style: GoogleFonts.bebasNeue(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
                 ),
@@ -411,7 +412,7 @@ class _TelaInicialState extends State<TelaInicial> {
                         },
                         child: Container(
                           width: double.infinity,
-                          height: 150,
+                          height: 110,
                           decoration: BoxDecoration(
                             color: const Color(0xFF9D291A),
                             borderRadius: BorderRadius.circular(12),
@@ -455,7 +456,7 @@ class _TelaInicialState extends State<TelaInicial> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
 
                 // Calendário de Treinos
                 Text(
@@ -466,7 +467,7 @@ class _TelaInicialState extends State<TelaInicial> {
                     color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 4),
                 SizedBox(
                   height: 180,
                   child: Row(
@@ -488,10 +489,15 @@ class _TelaInicialState extends State<TelaInicial> {
                                   'porcentagem': 0.0
                                 };
                             return _buildDayCard(
-                                now.subtract(const Duration(days: 1)),
-                                data['tipo'],
-                                data['porcentagem'],
-                                Colors.grey);
+                              now.subtract(const Duration(days: 1)),
+                              data[
+                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['porcentagem'],
+                              Colors.white,
+                              textColor: const Color(0xFF9D291A),
+                              borderColor: const Color(0xFF9D291A),
+                              now: now,
+                            );
                           },
                         ),
                       ),
@@ -510,10 +516,14 @@ class _TelaInicialState extends State<TelaInicial> {
                                   'porcentagem': 0.0
                                 };
                             return _buildDayCard(
-                                now,
-                                data['tipo'],
-                                data['porcentagem'],
-                                AppTheme.theme.colorScheme.secondary);
+                              now,
+                              data[
+                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['porcentagem'],
+                              const Color(0xFF9D291A),
+                              textColor: Colors.white,
+                              now: now,
+                            );
                           },
                         ),
                       ),
@@ -533,10 +543,15 @@ class _TelaInicialState extends State<TelaInicial> {
                                   'porcentagem': 0.0
                                 };
                             return _buildDayCard(
-                                now.add(const Duration(days: 1)),
-                                data['tipo'],
-                                data['porcentagem'],
-                                Colors.grey);
+                              now.add(const Duration(days: 1)),
+                              data[
+                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['porcentagem'],
+                              Colors.white,
+                              textColor: const Color(0xFF9D291A),
+                              borderColor: const Color(0xFF9D291A),
+                              now: now,
+                            );
                           },
                         ),
                       ),
@@ -666,12 +681,23 @@ class _TelaInicialState extends State<TelaInicial> {
   }
 
   Widget _buildDayCard(
-      DateTime date, String treino, double porcentagem, Color backgroundColor) {
+      DateTime date, String treino, double porcentagem, Color backgroundColor,
+      {Color textColor = Colors.black,
+      Color? borderColor,
+      required DateTime now}) {
+    // Determina o texto da porcentagem com base no contexto
+    String porcentagemTexto = '';
+    if (date == now && porcentagem > 0 && porcentagem < 100) {
+      porcentagemTexto = 'Em andamento';
+    } else if (date == now.subtract(const Duration(days: 1)) &&
+        (porcentagem == 0 || treino == 'Nenhum')) {
+      porcentagemTexto = 'Descanso!';
+    } else {
+      porcentagemTexto = '${porcentagem.toStringAsFixed(0)}%';
+    }
+
     return GestureDetector(
       onTap: () async {
-        setState(() {
-          _focusedDay = date;
-        });
         final workout = await _getActiveWorkout(date);
         if (workout != null &&
             (workout['treinos'] as List?)?.isNotEmpty == true) {
@@ -698,8 +724,8 @@ class _TelaInicialState extends State<TelaInicial> {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
-          border: _focusedDay == date
-              ? Border.all(color: AppTheme.theme.colorScheme.primary, width: 2)
+          border: borderColor != null
+              ? Border.all(color: borderColor, width: 2)
               : null,
         ),
         child: Center(
@@ -708,21 +734,33 @@ class _TelaInicialState extends State<TelaInicial> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Center(
-                child: Text('${date.day}',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '${date.day}',
+                  style: GoogleFonts.bebasNeue(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
               ),
-              //const SizedBox(height: 8),
               Center(
-                child: Text(treino,
-                    style: AppTheme.theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.theme.colorScheme.onPrimary)),
+                child: Text(
+                  treino,
+                  style: GoogleFonts.bebasNeue(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
               ),
-              Text('${porcentagem.toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF9D291A))),
+              Text(
+                porcentagemTexto,
+                style: GoogleFonts.bebasNeue(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
             ],
           ),
         ),
