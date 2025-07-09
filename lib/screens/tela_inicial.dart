@@ -31,161 +31,23 @@ class _TelaInicialState extends State<TelaInicial> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
   final PlanGeneratorService _planGenerator = PlanGeneratorService();
-  bool _showCreatePlanDialog = false;
 
   @override
   void initState() {
     super.initState();
-    _suggestAndSavePlanIfNeeded(); // Verifica e sugere plano ao iniciar
-  }
-
-  Future<void> _suggestAndSavePlanIfNeeded() async {
-    if (user == null) return;
-    final userId = user!.uid;
-    final planDoc = await _firestore
-        .collection('usuarios')
-        .doc(userId)
-        .collection('planos_treino')
-        .doc('personalized')
-        .get();
-    if (!planDoc.exists) {
-      await _suggestAndSavePlan(); // Gera plano apenas se não existir
-    }
-  }
-
-  Future<void> _suggestAndSavePlan() async {
-    if (user == null) return;
-    final userId = user!.uid;
-    try {
-      // Verificar se os dados do onboarding existem na subcoleção
-      final onboardingSnapshot = await _firestore
-          .collection('usuarios')
-          .doc(userId)
-          .collection('onboarding')
-          .doc('data')
-          .get();
-      if (!onboardingSnapshot.exists) {
-        debugPrint('Dados de onboarding não encontrados. Criando padrão...');
-        await _firestore
-            .collection('usuarios')
-            .doc(userId)
-            .collection('onboarding')
-            .doc('data')
-            .set({
-          'peso': 70.0, // Valor padrão
-          'altura': 170.0, // Valor padrão
-          'frequencia': 3, // Valor padrão
-        });
-      }
-
-      // Gerar o plano com os dados disponíveis
-      await _planGenerator.generateTrainingPlan(userId, customDays: 5);
-    } catch (e) {
-      debugPrint('Erro ao sugerir plano: $e');
-    }
-  }
-
-  Future<void> _generatePlan() async {
-    if (user == null) return;
-    try {
-      await _planGenerator.generateTrainingPlan(user!.uid, customDays: 5);
-      setState(() => _showCreatePlanDialog = false); // Recarrega a UI
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Plano de treino gerado com sucesso!')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Erro ao gerar plano: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao gerar plano: $e')),
-        );
-      }
-    }
-  }
-
-  void _showCreatePlanOptions() {
-    setState(() => _showCreatePlanDialog = true);
+    // _suggestAndSavePlanIfNeeded(); // Comentado, pois usamos geração dinâmica
   }
 
   Future<Map<String, dynamic>?> _getActiveWorkout(DateTime date) async {
     if (user == null) return null;
     final userId = user!.uid;
-    final dayOfWeek = date.weekday; // 1 = Segunda, ..., 7 = Domingo
     final normalizedDate = DateTime(date.year, date.month, date.day);
 
     try {
-      final planosSnapshot = await _firestore
-          .collection('usuarios')
-          .doc(userId)
-          .collection('planos_treino')
-          .doc('personalized')
-          .get();
+      // Gera o treino dinamicamente usando o PlanGeneratorService
+      final workout = await _planGenerator.generateDynamicWorkout(userId, date);
 
-      Map<String, dynamic>? plano;
-      if (!planosSnapshot.exists) {
-        return {
-          'tipo': 'Nenhum',
-          'musculos': 'Nenhum plano de treino ativo'.toUpperCase(),
-          'porcentagem': 0.0,
-          'treinos': [],
-          'createdAt': null,
-          'tempoEstimado': 0,
-          'caloriasEstimadas': 0.0,
-        };
-      } else {
-        plano = planosSnapshot.data();
-      }
-
-      final treinos = plano?['treinos'] as List<dynamic>? ?? [];
-      final treinoIndex = (dayOfWeek - 1) %
-          (plano?['frequenciaTreino'] as int? ?? treinos.length);
-
-      if (treinoIndex >= treinos.length) {
-        return {
-          'tipo': 'Nenhum',
-          'musculos': 'Nenhum treino para hoje'.toUpperCase(),
-          'porcentagem': 0.0,
-          'treinos': [],
-          'createdAt': null,
-          'tempoEstimado': 0,
-          'caloriasEstimadas': 0.0,
-        };
-      }
-
-      final treino = treinos[treinoIndex];
-      final exercicios = treino['exercicios'] as List<dynamic>? ?? [];
-      final musculosMap = {
-        'Peito': 'Peito, Tríceps',
-        'Costas': 'Costas, Bíceps',
-        'Pernas': 'Quadríceps, Glúteos, Panturrilhas',
-        'Ombros': 'Ombros',
-        'Abdômen': 'Core',
-      };
-
-      final musculosList = exercicios.map((ex) {
-        final group = ex['grupoMuscular'] as String?;
-        return musculosMap[group] ?? 'Músculos não mapeados';
-      }).toList();
-
-      int tempoEstimado = 0;
-      double caloriasEstimadas = 0.0;
-      final onboardingData = await _firestore
-          .collection('usuarios')
-          .doc(userId)
-          .collection('onboarding')
-          .doc('data')
-          .get();
-      final peso = onboardingData.data()?['peso']?.toDouble() ?? 70.0;
-      for (var ex in exercicios) {
-        final series = ex['series'] as int? ?? 0;
-        final repeticoes = ex['repeticoes'] as int? ?? 0;
-        tempoEstimado += series * (repeticoes * 3 + 60);
-        caloriasEstimadas += series * repeticoes * 0.5 * (peso / 70);
-      }
-      tempoEstimado = (tempoEstimado / 60).round();
-
+      // Consulta ao Firestore para calcular a porcentagem
       final treinoSnapshot = await _firestore
           .collection('usuarios')
           .doc(userId)
@@ -195,10 +57,11 @@ class _TelaInicialState extends State<TelaInicial> {
               isLessThan: normalizedDate.add(const Duration(days: 1)))
           .get();
 
-      double porcentagem = 0.0;
+      double porcentagem = workout['porcentagem'] as double? ?? 0.0;
       if (treinoSnapshot.docs.isNotEmpty) {
-        final workout = treinoSnapshot.docs.first.data();
-        final exerciciosList = workout['exercicios'] as List<dynamic>? ?? [];
+        final workoutData = treinoSnapshot.docs.first.data();
+        final exerciciosList =
+            workoutData['exercicios'] as List<dynamic>? ?? [];
         int totalSeries = 0;
         int seriesConcluidas = 0;
         for (var ex in exerciciosList) {
@@ -211,20 +74,7 @@ class _TelaInicialState extends State<TelaInicial> {
       }
 
       return {
-        'treinos': [
-          {
-            'exercicios': exercicios,
-          },
-        ],
-        'createdAt': FieldValue.serverTimestamp(),
-        'tempoEstimado': tempoEstimado,
-        'caloriasEstimadas': caloriasEstimadas,
-        'tipo': exercicios.isNotEmpty
-            ? exercicios[0]['grupoMuscular'] ?? 'Treino'
-            : 'Treino', // Usa grupoMuscular como nome
-        'musculos': musculosList.isNotEmpty
-            ? musculosList.join(', ').toUpperCase()
-            : 'Sem informações de músculos'.toUpperCase(),
+        ...workout,
         'porcentagem': porcentagem,
       };
     } catch (e) {
@@ -286,7 +136,7 @@ class _TelaInicialState extends State<TelaInicial> {
 
   @override
   Widget build(BuildContext context) {
-    final DateTime now = DateTime.now(); // 11:45 PM WEST, 26 de junho de 2025
+    final DateTime now = DateTime.now(); // 11:47 PM WEST, 09 de julho de 2025
     final String formattedDate =
         DateFormat('EEE, dd \'DE\' MMMM \'DE\' yyyy', 'pt_BR')
             .format(now)
@@ -397,11 +247,9 @@ class _TelaInicialState extends State<TelaInicial> {
                           };
                       return GestureDetector(
                         onTap: () {
-                          if (workout['tipo'] == 'Nenhum' &&
-                              workout['musculos'] ==
-                                  'Nenhum plano de treino ativo'
-                                      .toUpperCase()) {
-                            _showCreatePlanOptions();
+                          if (workout['musculos'] ==
+                              'Nenhum plano de treino ativo'.toUpperCase()) {
+                            // _showCreatePlanOptions(); // Desativado por agora
                           } else {
                             Navigator.push(
                               context,
@@ -418,33 +266,30 @@ class _TelaInicialState extends State<TelaInicial> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Stack(
-                            fit: StackFit
-                                .expand, // Garante que o Stack ocupe todo o espaço do Container
+                            fit: StackFit.expand,
                             children: [
-                              // Texto posicionado exatamente na borda inferior
                               Positioned(
-                                left: 10, // Mantém o padding esquerdo original
-                                bottom: 0, // Cola o texto à borda inferior
+                                left: 10,
+                                bottom: 0,
                                 child: Text(
                                   workout['musculos'],
                                   style: GoogleFonts.bebasNeue(
                                     fontSize: 30,
                                     color: Colors.white,
                                   ),
-                                  overflow: TextOverflow
-                                      .ellipsis, // Trunca com "..." se exceder
-                                  maxLines: 1, // Limita a uma linha
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
-                              // Botão condicional posicionado acima
                               if (workout['musculos'] ==
                                   'Nenhum plano de treino ativo'.toUpperCase())
                                 Positioned(
                                   left: 20,
-                                  top:
-                                      20, // Ajuste para posicionar o botão acima
+                                  top: 20,
                                   child: ElevatedButton(
-                                    onPressed: _showCreatePlanOptions,
+                                    onPressed: () {
+                                      // _showCreatePlanOptions(); // Desativado por agora
+                                    },
                                     child: const Text('Criar Plano de Treino'),
                                   ),
                                 ),
@@ -456,7 +301,7 @@ class _TelaInicialState extends State<TelaInicial> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
                 // Calendário de Treinos
                 Text(
@@ -490,8 +335,7 @@ class _TelaInicialState extends State<TelaInicial> {
                                 };
                             return _buildDayCard(
                               now.subtract(const Duration(days: 1)),
-                              data[
-                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['musculos'],
                               data['porcentagem'],
                               Colors.white,
                               textColor: const Color(0xFF9D291A),
@@ -517,8 +361,7 @@ class _TelaInicialState extends State<TelaInicial> {
                                 };
                             return _buildDayCard(
                               now,
-                              data[
-                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['musculos'],
                               data['porcentagem'],
                               const Color(0xFF9D291A),
                               textColor: Colors.white,
@@ -544,8 +387,7 @@ class _TelaInicialState extends State<TelaInicial> {
                                 };
                             return _buildDayCard(
                               now.add(const Duration(days: 1)),
-                              data[
-                                  'musculos'], // Usando 'musculos' em vez de 'tipo'
+                              data['musculos'],
                               data['porcentagem'],
                               Colors.white,
                               textColor: const Color(0xFF9D291A),
@@ -562,11 +404,14 @@ class _TelaInicialState extends State<TelaInicial> {
                 const SizedBox(height: 24),
 
                 // Progresso
-                const Text('PROGRESSO',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF9D291A))),
+                Text(
+                  'PROGRESSO'.toUpperCase(),
+                  style: GoogleFonts.bebasNeue(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 FutureBuilder<Map<String, double>>(
                   future: _getProgressData(),
@@ -635,47 +480,6 @@ class _TelaInicialState extends State<TelaInicial> {
           unselectedItemColor: AppTheme.theme.colorScheme.onPrimary,
           backgroundColor: AppTheme.theme.scaffoldBackgroundColor,
         ),
-        // Diálogo para criar plano
-        bottomSheet: _showCreatePlanDialog
-            ? Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Como deseja criar o plano?',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _generatePlan,
-                      child: const Text(
-                          'Gerar Automaticamente (com base no Onboarding)'),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Criação manual ainda não implementada')),
-                        );
-                        setState(() => _showCreatePlanDialog = false);
-                      },
-                      child: const Text('Criar Manualmente'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () =>
-                          setState(() => _showCreatePlanDialog = false),
-                      child: const Text('Cancelar'),
-                    ),
-                  ],
-                ),
-              )
-            : null,
       ),
     );
   }
@@ -685,7 +489,6 @@ class _TelaInicialState extends State<TelaInicial> {
       {Color textColor = Colors.black,
       Color? borderColor,
       required DateTime now}) {
-    // Determina o texto da porcentagem com base no contexto
     String porcentagemTexto = '';
     if (date == now && porcentagem > 0 && porcentagem < 100) {
       porcentagemTexto = 'Em andamento';
@@ -746,6 +549,7 @@ class _TelaInicialState extends State<TelaInicial> {
               Center(
                 child: Text(
                   treino,
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.bebasNeue(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -755,6 +559,7 @@ class _TelaInicialState extends State<TelaInicial> {
               ),
               Text(
                 porcentagemTexto,
+                textAlign: TextAlign.center,
                 style: GoogleFonts.bebasNeue(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

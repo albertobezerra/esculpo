@@ -4,11 +4,52 @@ import 'package:flutter/material.dart';
 class PlanGeneratorService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Determina o tipo de treino dinamicamente
+  String _determineWorkoutType(int dayOfWeek, int frequencia, double peso) {
+    final cycleLength = 7 ~/ frequencia; // Ex.: 7 / 3 = 2-3 dias por ciclo
+    final cycleIndex = (dayOfWeek - 1) % cycleLength;
+
+    final muscleGroups = {
+      0: peso > 80.0 ? 'Quadríceps, Glúteos, Panturrilhas' : 'Peito, Tríceps',
+      1: 'Costas, Bíceps',
+      2: 'Ombros',
+    };
+
+    return muscleGroups[cycleIndex] ?? 'Abdômen, Core';
+  }
+
+  // Gera um treino dinâmico com base no onboarding
+  Future<Map<String, dynamic>> generateDynamicWorkout(
+      String userId, DateTime date) async {
+    final dayOfWeek = date.weekday;
+    final onboardingData = await _firestore
+        .collection('usuarios')
+        .doc(userId)
+        .collection('onboarding')
+        .doc('data')
+        .get();
+    final peso = onboardingData.data()?['peso']?.toDouble() ?? 70.0;
+    final frequencia = onboardingData.data()?['frequencia']?.toInt() ?? 3;
+
+    String tipo = _determineWorkoutType(dayOfWeek, frequencia, peso);
+    int tempoEstimado = 60; // Valor base, a ajustar
+    double caloriasEstimadas = peso * 0.5; // Estimativa simples
+
+    return {
+      'tipo': tipo,
+      'musculos': tipo.toUpperCase(),
+      'tempoEstimado': tempoEstimado,
+      'caloriasEstimadas': caloriasEstimadas,
+      'porcentagem': 0.0, // A ser calculado em _getActiveWorkout
+      'treinos': [], // Pode ser expandido para incluir exercícios
+    };
+  }
+
+  // Opcional: Gerar e salvar plano completo (se desejar)
   Future<void> generateTrainingPlan(String userId, {int? customDays}) async {
     try {
       debugPrint('Iniciando geração de plano para $userId...');
 
-      // Carregar dados do onboarding
       final onboardingDoc = await _firestore
           .collection('usuarios')
           .doc(userId)
@@ -32,7 +73,6 @@ class PlanGeneratorService {
       debugPrint(
           'Dados de onboarding carregados: experiencia=$experienceLevel, preferencia=$focusMuscleGroups, objetivo=$objective');
 
-      // Sugerir dias com base no nível
       int suggestedDays;
       switch (experienceLevel) {
         case 'Sim, regularmente':
@@ -49,16 +89,15 @@ class PlanGeneratorService {
           suggestedDays = 3;
       }
 
-      // Usar dias customizados, se fornecidos (até 7)
       final trainingFrequency =
           customDays != null && customDays <= 7 ? customDays : suggestedDays;
 
-      // Carregar exercícios
       final exercisesSnapshot = await _firestore.collection('exercicios').get();
       if (exercisesSnapshot.docs.isEmpty) {
         debugPrint('Nenhum exercício encontrado na coleção "exercicios"');
         throw Exception('Nenhum exercício disponível para gerar o plano');
       }
+
       final exercises = exercisesSnapshot.docs.map((doc) {
         return {
           ...doc.data(),
@@ -68,7 +107,6 @@ class PlanGeneratorService {
       }).toList();
       debugPrint('Exercícios carregados: ${exercises.length} documentos');
 
-      // Filtrar exercícios
       final filteredExercises = exercises.where((ex) {
         final muscleGroup = ex['grupoMuscular'] as String?;
         final level = ex['nivel'] as String?;
@@ -90,7 +128,6 @@ class PlanGeneratorService {
         throw Exception('Nenhum exercício compatível encontrado');
       }
 
-      // Configurações por nível
       final sets = experienceLevel.contains('regularmente')
           ? 5
           : experienceLevel.contains('>6 meses')
@@ -107,7 +144,6 @@ class PlanGeneratorService {
               ? 45
               : 60;
 
-      // Gerar treinos
       final treinos = <Map<String, dynamic>>[];
       for (int i = 0; i < trainingFrequency; i++) {
         final selectedExercises = filteredExercises
@@ -133,7 +169,6 @@ class PlanGeneratorService {
         });
       }
 
-      // Salvar plano
       await _firestore
           .collection('usuarios')
           .doc(userId)
@@ -155,7 +190,6 @@ class PlanGeneratorService {
     }
   }
 
-  // Mapeia o tipo de exercício com base nos dados
   String _mapExerciseType(Map<String, dynamic> exercise) {
     final name = exercise['nome'] as String? ?? '';
     if (name.toLowerCase().contains('cardio') ||
@@ -165,7 +199,6 @@ class PlanGeneratorService {
     return 'Força';
   }
 
-  // Verifica se o tipo de exercício corresponde ao objetivo
   bool _matchesObjective(String exerciseType, String objective) {
     if (objective == 'Perder peso' &&
         (exerciseType == 'Cardio' || exerciseType == 'Força')) {
