@@ -476,9 +476,9 @@ class _TelaInicialState extends State<TelaInicial> {
             BottomNavigationBarItem(
                 icon: Icon(Icons.directions_run), label: 'Exercícios'),
           ],
-          selectedItemColor: AppTheme.theme.colorScheme.primary,
-          unselectedItemColor: AppTheme.theme.colorScheme.onPrimary,
-          backgroundColor: AppTheme.theme.scaffoldBackgroundColor,
+          selectedItemColor: Colors.white,
+          unselectedItemColor: const Color(0xFF9D291A),
+          backgroundColor: const Color(0xFF9D291A),
         ),
       ),
     );
@@ -610,8 +610,10 @@ class _TelaInicialState extends State<TelaInicial> {
                 annotations: <GaugeAnnotation>[
                   GaugeAnnotation(
                     widget: Text(label,
-                        style: AppTheme.theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.theme.colorScheme.onPrimary)),
+                        style: GoogleFonts.bebasNeue(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF9D291A))),
                     angle: 90,
                     positionFactor: 0.5,
                   ),
@@ -623,7 +625,10 @@ class _TelaInicialState extends State<TelaInicial> {
         const SizedBox(height: 8),
         Text(description,
             textAlign: TextAlign.center,
-            style: AppTheme.theme.textTheme.bodySmall),
+            style: GoogleFonts.bebasNeue(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF9D291A))),
       ],
     );
   }
