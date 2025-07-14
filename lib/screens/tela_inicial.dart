@@ -5,6 +5,8 @@ import 'package:guarda_corpo_2024/services/plan_generator_service.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
+import 'package:circular_bottom_navigation/circular_bottom_navigation.dart';
+import 'package:circular_bottom_navigation/tab_item.dart';
 import 'tela_planos_treino.dart';
 import 'tela_historico_treinos.dart';
 import 'tela_exercicios.dart';
@@ -31,11 +33,18 @@ class _TelaInicialState extends State<TelaInicial> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
   final PlanGeneratorService _planGenerator = PlanGeneratorService();
+  late CircularBottomNavigationController _navigationController;
 
   @override
   void initState() {
     super.initState();
-    // _suggestAndSavePlanIfNeeded(); // Comentado, pois usamos geração dinâmica
+    _navigationController = CircularBottomNavigationController(_selectedIndex);
+  }
+
+  @override
+  void dispose() {
+    _navigationController.dispose();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>?> _getActiveWorkout(DateTime date) async {
@@ -44,10 +53,8 @@ class _TelaInicialState extends State<TelaInicial> {
     final normalizedDate = DateTime(date.year, date.month, date.day);
 
     try {
-      // Gera o treino dinamicamente usando o PlanGeneratorService
       final workout = await _planGenerator.generateDynamicWorkout(userId, date);
 
-      // Consulta ao Firestore para calcular a porcentagem
       final treinoSnapshot = await _firestore
           .collection('usuarios')
           .doc(userId)
@@ -134,9 +141,158 @@ class _TelaInicialState extends State<TelaInicial> {
     }
   }
 
+  Widget _buildDayCard(
+      DateTime date, String treino, double porcentagem, Color backgroundColor,
+      {Color textColor = Colors.black,
+      Color? borderColor,
+      required DateTime now}) {
+    String porcentagemTexto = '';
+    if (date == now && porcentagem > 0 && porcentagem < 100) {
+      porcentagemTexto = 'Em andamento';
+    } else if (date == now.subtract(const Duration(days: 1)) &&
+        (porcentagem == 0 || treino == 'Nenhum')) {
+      porcentagemTexto = 'Descanso!';
+    } else {
+      porcentagemTexto = '${porcentagem.toStringAsFixed(0)}%';
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        final workout = await _getActiveWorkout(date);
+        if (workout != null &&
+            (workout['treinos'] as List?)?.isNotEmpty == true) {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TelaDetalheTreino(workout: workout),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Nenhum treino disponível para este dia')),
+            );
+          }
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: borderColor != null
+              ? Border.all(color: borderColor, width: 2)
+              : null,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Center(
+                child: Text(
+                  '${date.day}',
+                  style: GoogleFonts.bebasNeue(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Center(
+                child: Text(
+                  treino,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.bebasNeue(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Text(
+                porcentagemTexto,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.bebasNeue(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGauge(String title, double value, double maxValue, String label,
+      String description) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 100,
+          height: 100,
+          child: SfRadialGauge(
+            axes: <RadialAxis>[
+              RadialAxis(
+                minimum: 0,
+                maximum: maxValue,
+                showLabels: false,
+                showTicks: false,
+                ranges: <GaugeRange>[
+                  GaugeRange(
+                    startValue: 0,
+                    endValue: value,
+                    color: AppTheme.theme.colorScheme.secondary,
+                  ),
+                  GaugeRange(
+                    startValue: value,
+                    endValue: maxValue,
+                    color: AppTheme.theme.colorScheme.surface.withAlpha(77),
+                  ),
+                ],
+                pointers: <GaugePointer>[
+                  RangePointer(
+                    value: value,
+                    width: 0.1,
+                    sizeUnit: GaugeSizeUnit.factor,
+                    color: AppTheme.theme.colorScheme.secondary,
+                  ),
+                ],
+                annotations: <GaugeAnnotation>[
+                  GaugeAnnotation(
+                    widget: Text(label,
+                        style: GoogleFonts.bebasNeue(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF9D291A))),
+                    angle: 90,
+                    positionFactor: 0.5,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(description,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.bebasNeue(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF9D291A))),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final DateTime now = DateTime.now(); // 11:47 PM WEST, 09 de julho de 2025
+    final DateTime now = DateTime.now(); // 06:50 PM WEST, 14 de julho de 2025
     final String formattedDate =
         DateFormat('EEE, dd \'DE\' MMMM \'DE\' yyyy', 'pt_BR')
             .format(now)
@@ -149,6 +305,18 @@ class _TelaInicialState extends State<TelaInicial> {
       greeting = 'Boa noite,';
     }
     final userName = user?.displayName ?? 'Usuário';
+
+    // Configuração dos itens da navegação circular
+    List<TabItem> tabItems = [
+      TabItem(Icons.home, "Início", Colors.white,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold)),
+      TabItem(Icons.calendar_today, "Planos", Colors.white,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold)),
+      TabItem(Icons.history, "Histórico", Colors.white,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold)),
+      TabItem(Icons.directions_run, "Exercícios", Colors.white,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold)),
+    ];
 
     return Theme(
       data: AppTheme.theme,
@@ -454,182 +622,31 @@ class _TelaInicialState extends State<TelaInicial> {
             ),
           ),
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) {
-            setState(() {
-              _selectedIndex = index;
-            });
-            if (index != 0) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => _pages[index]),
-              );
+        bottomNavigationBar: CircularBottomNavigation(
+          tabItems,
+          controller: _navigationController,
+          selectedPos: _selectedIndex,
+          barHeight: 60,
+          circleSize: 50,
+          barBackgroundColor: const Color(0xFF9D291A),
+          normalIconColor: Colors.grey,
+          selectedIconColor: const Color(0xFF9D291A),
+          iconsSize: 24,
+          selectedCallback: (int? selectedPos) {
+            if (selectedPos != null) {
+              setState(() {
+                _selectedIndex = selectedPos;
+              });
+              if (selectedPos != 0) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => _pages[selectedPos]),
+                );
+              }
             }
           },
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Início'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today), label: 'Planos'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.history), label: 'Histórico'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.directions_run), label: 'Exercícios'),
-          ],
-          selectedItemColor: Colors.white,
-          unselectedItemColor: const Color(0xFF9D291A),
-          backgroundColor: const Color(0xFF9D291A),
         ),
       ),
-    );
-  }
-
-  Widget _buildDayCard(
-      DateTime date, String treino, double porcentagem, Color backgroundColor,
-      {Color textColor = Colors.black,
-      Color? borderColor,
-      required DateTime now}) {
-    String porcentagemTexto = '';
-    if (date == now && porcentagem > 0 && porcentagem < 100) {
-      porcentagemTexto = 'Em andamento';
-    } else if (date == now.subtract(const Duration(days: 1)) &&
-        (porcentagem == 0 || treino == 'Nenhum')) {
-      porcentagemTexto = 'Descanso!';
-    } else {
-      porcentagemTexto = '${porcentagem.toStringAsFixed(0)}%';
-    }
-
-    return GestureDetector(
-      onTap: () async {
-        final workout = await _getActiveWorkout(date);
-        if (workout != null &&
-            (workout['treinos'] as List?)?.isNotEmpty == true) {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TelaDetalheTreino(workout: workout),
-              ),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Nenhum treino disponível para este dia')),
-            );
-          }
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: borderColor != null
-              ? Border.all(color: borderColor, width: 2)
-              : null,
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Center(
-                child: Text(
-                  '${date.day}',
-                  style: GoogleFonts.bebasNeue(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-              ),
-              Center(
-                child: Text(
-                  treino,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.bebasNeue(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-              ),
-              Text(
-                porcentagemTexto,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGauge(String title, double value, double maxValue, String label,
-      String description) {
-    return Column(
-      children: [
-        SizedBox(
-          width: 100,
-          height: 100,
-          child: SfRadialGauge(
-            axes: <RadialAxis>[
-              RadialAxis(
-                minimum: 0,
-                maximum: maxValue,
-                showLabels: false,
-                showTicks: false,
-                ranges: <GaugeRange>[
-                  GaugeRange(
-                    startValue: 0,
-                    endValue: value,
-                    color: AppTheme.theme.colorScheme.secondary,
-                  ),
-                  GaugeRange(
-                    startValue: value,
-                    endValue: maxValue,
-                    color: AppTheme.theme.colorScheme.surface.withAlpha(77),
-                  ),
-                ],
-                pointers: <GaugePointer>[
-                  RangePointer(
-                    value: value,
-                    width: 0.1,
-                    sizeUnit: GaugeSizeUnit.factor,
-                    color: AppTheme.theme.colorScheme.secondary,
-                  ),
-                ],
-                annotations: <GaugeAnnotation>[
-                  GaugeAnnotation(
-                    widget: Text(label,
-                        style: GoogleFonts.bebasNeue(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF9D291A))),
-                    angle: 90,
-                    positionFactor: 0.5,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(description,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.bebasNeue(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF9D291A))),
-      ],
     );
   }
 }
