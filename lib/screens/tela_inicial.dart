@@ -47,7 +47,7 @@ class _TelaInicialState extends State<TelaInicial> {
                 ? leftOffset
                 : 20, // Garante mínimo de 20 pixels de margem
             bottom: 30,
-            child: Container(
+            child: SizedBox(
               width: barWidth, // Largura proporcional
               height: 70,
               child: Material(
@@ -354,7 +354,7 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
 
   @override
   Widget build(BuildContext context) {
-    final DateTime now = DateTime.now(); // 07:29 PM WEST, 15 de julho de 2025
+    final DateTime now = DateTime.now(); // 07:33 PM WEST, 16 de julho de 2025
     final String formattedDate =
         DateFormat('EEE, dd \'DE\' MMMM \'DE\' yyyy', 'pt_BR')
             .format(now)
@@ -368,297 +368,305 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
     }
     final userName = user?.displayName ?? 'Usuário';
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Color(0xFF9D291A),
-                  child: Icon(Icons.person, size: 40, color: Colors.white),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      greeting.toUpperCase(),
-                      style: GoogleFonts.bebasNeue(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                        height: 1.0,
-                      ),
-                    ),
-                    const SizedBox.shrink(),
-                    Text(
-                      userName.toUpperCase(),
-                      style: GoogleFonts.bebasNeue(
-                        color: const Color(0xFF9D291A),
-                        fontSize: 38,
-                        height: 1.0,
-                      ),
-                    ),
-                    const SizedBox.shrink(),
-                    Text(
-                      formattedDate,
-                      style: GoogleFonts.bebasNeue(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: hasNotification
-                      ? const Color(0xFF9D291A)
-                      : AppTheme.theme.colorScheme.surface,
-                  child: IconButton(
-                    icon: const Icon(Icons.notifications,
-                        color: Color.fromARGB(255, 225, 225, 225), size: 20),
-                    onPressed: () {
-                      setState(() {
-                        hasNotification = !hasNotification;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Treino do Dia
-            Text(
-              'HOJE É DIA DE TREINAR'.toUpperCase(),
-              style: GoogleFonts.bebasNeue(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: FutureBuilder<Map<String, dynamic>?>(
-                future: _getActiveWorkout(now),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const CircularProgressIndicator();
-                  }
-                  final workout = snapshot.data ??
-                      {
-                        'tipo': 'Nenhum',
-                        'musculos':
-                            'Nenhum plano de treino ativo'.toUpperCase(),
-                        'porcentagem': 0.0,
-                      };
-                  return GestureDetector(
-                    onTap: () {
-                      if (workout['musculos'] ==
-                          'Nenhum plano de treino ativo'.toUpperCase()) {
-                        // _showCreatePlanOptions(); // Desativado por agora
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaTreino()),
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      height: 110,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9D291A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Positioned(
-                            left: 10,
-                            bottom: 0,
-                            child: Text(
-                              workout['musculos'],
-                              style: GoogleFonts.bebasNeue(
-                                fontSize: 30,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                          if (workout['musculos'] ==
-                              'Nenhum plano de treino ativo'.toUpperCase())
-                            Positioned(
-                              left: 20,
-                              top: 20,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  // _showCreatePlanOptions(); // Desativado por agora
-                                },
-                                child: const Text('Criar Plano de Treino'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Calendário de Treinos
-            Text(
-              'CALÉNDARIO DE TREINOS'.toUpperCase(),
-              style: GoogleFonts.bebasNeue(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 180,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return SingleChildScrollView(
+      // Adicionado para permitir scroll
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Flexible(
-                    child: FutureBuilder<Map<String, dynamic>?>(
-                      future: _getActiveWorkout(
-                          now.subtract(const Duration(days: 1))),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        }
-                        final data = snapshot.data ??
-                            {
-                              'tipo': 'Nenhum',
-                              'musculos': 'Sem treino',
-                              'porcentagem': 0.0
-                            };
-                        return _buildDayCard(
-                          now.subtract(const Duration(days: 1)),
-                          data['musculos'],
-                          data['porcentagem'],
-                          Colors.white,
-                          textColor: const Color(0xFF9D291A),
-                          borderColor: const Color(0xFF9D291A),
-                          now: now,
-                        );
-                      },
-                    ),
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Color(0xFF9D291A),
+                    child: Icon(Icons.person, size: 40, color: Colors.white),
                   ),
-                  Flexible(
-                    child: FutureBuilder<Map<String, dynamic>?>(
-                      future: _getActiveWorkout(now),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        }
-                        final data = snapshot.data ??
-                            {
-                              'tipo': 'Nenhum',
-                              'musculos': 'Sem treino',
-                              'porcentagem': 0.0
-                            };
-                        return _buildDayCard(
-                          now,
-                          data['musculos'],
-                          data['porcentagem'],
-                          const Color(0xFF9D291A),
-                          textColor: Colors.white,
-                          now: now,
-                        );
-                      },
-                    ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        greeting.toUpperCase(),
+                        style: GoogleFonts.bebasNeue(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox.shrink(),
+                      Text(
+                        userName.toUpperCase(),
+                        style: GoogleFonts.bebasNeue(
+                          color: const Color(0xFF9D291A),
+                          fontSize: 38,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox.shrink(),
+                      Text(
+                        formattedDate,
+                        style: GoogleFonts.bebasNeue(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
                   ),
-                  Flexible(
-                    child: FutureBuilder<Map<String, dynamic>?>(
-                      future:
-                          _getActiveWorkout(now.add(const Duration(days: 1))),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        }
-                        final data = snapshot.data ??
-                            {
-                              'tipo': 'Nenhum',
-                              'musculos': 'Sem treino',
-                              'porcentagem': 0.0
-                            };
-                        return _buildDayCard(
-                          now.add(const Duration(days: 1)),
-                          data['musculos'],
-                          data['porcentagem'],
-                          Colors.white,
-                          textColor: const Color(0xFF9D291A),
-                          borderColor: const Color(0xFF9D291A),
-                          now: now,
-                        );
+                  const Spacer(),
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: hasNotification
+                        ? const Color(0xFF9D291A)
+                        : AppTheme.theme.colorScheme.surface,
+                    child: IconButton(
+                      icon: const Icon(Icons.notifications,
+                          color: Color.fromARGB(255, 225, 225, 225), size: 20),
+                      onPressed: () {
+                        setState(() {
+                          hasNotification = !hasNotification;
+                        });
                       },
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
-
-            // Progresso
-            Text(
-              'PROGRESSO'.toUpperCase(),
-              style: GoogleFonts.bebasNeue(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
+              // Treino do Dia
+              Text(
+                'HOJE É DIA DE TREINAR'.toUpperCase(),
+                style: GoogleFonts.bebasNeue(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            FutureBuilder<Map<String, double>>(
-              future: _getProgressData(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
-                final progress = snapshot.data ??
-                    {'calorias': 0.0, 'pesoLevantado': 0.0, 'tempoCardio': 0.0};
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: FutureBuilder<Map<String, dynamic>?>(
+                  future: _getActiveWorkout(now),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    }
+                    final workout = snapshot.data ??
+                        {
+                          'tipo': 'Nenhum',
+                          'musculos':
+                              'Nenhum plano de treino ativo'.toUpperCase(),
+                          'porcentagem': 0.0,
+                        };
+                    return GestureDetector(
+                      onTap: () {
+                        if (workout['musculos'] ==
+                            'Nenhum plano de treino ativo'.toUpperCase()) {
+                          // _showCreatePlanOptions(); // Desativado por agora
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const TelaTreino()),
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF9D291A),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Positioned(
+                              left: 10,
+                              bottom: 0,
+                              child: Text(
+                                workout['musculos'],
+                                style: GoogleFonts.bebasNeue(
+                                  fontSize: 30,
+                                  color: Colors.white,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            if (workout['musculos'] ==
+                                'Nenhum plano de treino ativo'.toUpperCase())
+                              Positioned(
+                                left: 20,
+                                top: 20,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // _showCreatePlanOptions(); // Desativado por agora
+                                  },
+                                  child: const Text('Criar Plano de Treino'),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Calendário de Treinos
+              Text(
+                'CALÉNDARIO DE TREINOS'.toUpperCase(),
+                style: GoogleFonts.bebasNeue(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 180,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildGauge(
-                        'Calorias',
-                        progress['calorias']!,
-                        500,
-                        '${progress['calorias']!.toStringAsFixed(0)}kcal',
-                        'Calorias gastas no treino'),
-                    _buildGauge(
-                        'Peso Levantado',
-                        progress['pesoLevantado']!,
-                        200,
-                        '${progress['pesoLevantado']!.toStringAsFixed(0)}kg',
-                        'Peso total levantado'),
-                    _buildGauge(
-                        'Tempo Cardio',
-                        progress['tempoCardio']!,
-                        60,
-                        '${progress['tempoCardio']!.toStringAsFixed(0)}min',
-                        'Tempo de cardio'),
+                    Flexible(
+                      child: FutureBuilder<Map<String, dynamic>?>(
+                        future: _getActiveWorkout(
+                            now.subtract(const Duration(days: 1))),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const CircularProgressIndicator();
+                          }
+                          final data = snapshot.data ??
+                              {
+                                'tipo': 'Nenhum',
+                                'musculos': 'Sem treino',
+                                'porcentagem': 0.0
+                              };
+                          return _buildDayCard(
+                            now.subtract(const Duration(days: 1)),
+                            data['musculos'],
+                            data['porcentagem'],
+                            Colors.white,
+                            textColor: const Color(0xFF9D291A),
+                            borderColor: const Color(0xFF9D291A),
+                            now: now,
+                          );
+                        },
+                      ),
+                    ),
+                    Flexible(
+                      child: FutureBuilder<Map<String, dynamic>?>(
+                        future: _getActiveWorkout(now),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const CircularProgressIndicator();
+                          }
+                          final data = snapshot.data ??
+                              {
+                                'tipo': 'Nenhum',
+                                'musculos': 'Sem treino',
+                                'porcentagem': 0.0
+                              };
+                          return _buildDayCard(
+                            now,
+                            data['musculos'],
+                            data['porcentagem'],
+                            const Color(0xFF9D291A),
+                            textColor: Colors.white,
+                            now: now,
+                          );
+                        },
+                      ),
+                    ),
+                    Flexible(
+                      child: FutureBuilder<Map<String, dynamic>?>(
+                        future:
+                            _getActiveWorkout(now.add(const Duration(days: 1))),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const CircularProgressIndicator();
+                          }
+                          final data = snapshot.data ??
+                              {
+                                'tipo': 'Nenhum',
+                                'musculos': 'Sem treino',
+                                'porcentagem': 0.0
+                              };
+                          return _buildDayCard(
+                            now.add(const Duration(days: 1)),
+                            data['musculos'],
+                            data['porcentagem'],
+                            Colors.white,
+                            textColor: const Color(0xFF9D291A),
+                            borderColor: const Color(0xFF9D291A),
+                            now: now,
+                          );
+                        },
+                      ),
+                    ),
                   ],
-                );
-              },
-            ),
-          ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Progresso
+              Text(
+                'PROGRESSO'.toUpperCase(),
+                style: GoogleFonts.bebasNeue(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<Map<String, double>>(
+                future: _getProgressData(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  }
+                  final progress = snapshot.data ??
+                      {
+                        'calorias': 0.0,
+                        'pesoLevantado': 0.0,
+                        'tempoCardio': 0.0
+                      };
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildGauge(
+                          'Calorias',
+                          progress['calorias']!,
+                          500,
+                          '${progress['calorias']!.toStringAsFixed(0)}kcal',
+                          'Calorias gastas no treino'),
+                      _buildGauge(
+                          'Peso Levantado',
+                          progress['pesoLevantado']!,
+                          200,
+                          '${progress['pesoLevantado']!.toStringAsFixed(0)}kg',
+                          'Peso total levantado'),
+                      _buildGauge(
+                          'Tempo Cardio',
+                          progress['tempoCardio']!,
+                          60,
+                          '${progress['tempoCardio']!.toStringAsFixed(0)}min',
+                          'Tempo de cardio'),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
