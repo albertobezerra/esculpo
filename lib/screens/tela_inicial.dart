@@ -6,6 +6,10 @@ import 'package:guarda_corpo_2024/services/plan_generator_service.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'tela_planos_treino.dart';
 import 'tela_historico_treinos.dart';
 import 'tela_exercicios.dart';
@@ -108,6 +112,66 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
   final PlanGeneratorService _planGenerator = PlanGeneratorService();
+  File? _profileImage; // Variável para armazenar a imagem do perfil
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage(); // Carrega a imagem ao iniciar o app
+  }
+
+  Future<void> _loadProfileImage() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final imagePath = path.join(directory.path, 'profile_image.jpg');
+    final file = File(imagePath);
+    if (await file.exists()) {
+      setState(() {
+        _profileImage = file;
+      });
+    }
+  }
+
+  Future<void> _saveProfileImage(File image) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final imagePath = path.join(directory.path, 'profile_image.jpg');
+    final file = File(imagePath);
+    await image.copy(file.path);
+    setState(() {
+      _profileImage = file;
+    });
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final file = File(pickedFile.path);
+      await _saveProfileImage(file);
+    }
+  }
+
+  Future<void> _showChangePhotoDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alterar Foto'),
+        content: const Text('Deseja alterar a foto de perfil?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Não'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _pickImage();
+            },
+            child: const Text('Sim'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<Map<String, dynamic>?> _getActiveWorkout(DateTime date) async {
     if (user == null) return null;
@@ -354,7 +418,7 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
 
   @override
   Widget build(BuildContext context) {
-    final DateTime now = DateTime.now(); // 07:33 PM WEST, 16 de julho de 2025
+    final DateTime now = DateTime.now(); // 12:05 AM WEST, 18 de julho de 2025
     final String formattedDate =
         DateFormat('EEE, dd \'DE\' MMMM \'DE\' yyyy', 'pt_BR')
             .format(now)
@@ -369,7 +433,6 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
     final userName = user?.displayName ?? 'Usuário';
 
     return SingleChildScrollView(
-      // Adicionado para permitir scroll
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -378,10 +441,21 @@ class _TelaInicialContentState extends State<TelaInicialContent> {
             children: [
               Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Color(0xFF9D291A),
-                    child: Icon(Icons.person, size: 40, color: Colors.white),
+                  GestureDetector(
+                    onTap: _profileImage == null
+                        ? _pickImage
+                        : _showChangePhotoDialog,
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: const Color(0xFF9D291A),
+                      foregroundImage: _profileImage != null
+                          ? FileImage(_profileImage!)
+                          : null,
+                      child: _profileImage == null
+                          ? const Icon(Icons.add_a_photo_outlined,
+                              size: 30, color: Colors.white)
+                          : null,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Column(
