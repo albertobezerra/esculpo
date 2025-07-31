@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:guarda_corpo_2024/services/subscription_service.dart';
 import 'package:share_plus/share_plus.dart';
-import '../services/subscription_service.dart'; // Ajustado
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -26,7 +26,8 @@ class ProfileScreen extends ConsumerWidget {
             return const Center(child: Text('Erro ao carregar perfil'));
           }
           final data = snapshot.data?.data() as Map<String, dynamic>?;
-          final completedSets = data?['completedSets'] ?? 0;
+          final completedSets = data?['seriesConcluidas'] ?? 0;
+          final points = completedSets * 10;
 
           return Padding(
             padding: const EdgeInsets.all(16.0),
@@ -47,6 +48,8 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text('IMC: ${data?['imc']?.toStringAsFixed(1) ?? 'N/A'}',
                     style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 16),
+                Text('Pontos: $points', style: const TextStyle(fontSize: 18)),
                 const SizedBox(height: 16),
                 if (completedSets >= 10)
                   Row(

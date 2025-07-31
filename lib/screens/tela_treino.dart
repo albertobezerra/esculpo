@@ -1,128 +1,10 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:guarda_corpo_2024/screens/tela_exercicios.dart';
+import 'package:guarda_corpo_2024/providers/providers.dart';
 import 'package:share_plus/share_plus.dart';
-import '../services/subscription_service.dart';
-
-final workoutProvider = Provider((ref) => WorkoutService());
-
-class WorkoutService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  Future<void> saveWorkout(String userId, Map<String, dynamic> workout) async {
-    await _firestore
-        .collection('usuarios') // Coleção alterada de 'users' para 'usuarios'
-        .doc(userId)
-        .collection('treinos') // Coleção alterada de 'workouts' para 'treinos'
-        .add(workout);
-  }
-
-  Future<void> updateCompletedSets(String userId, int sets) async {
-    await _firestore.collection('usuarios').doc(userId).update({
-      'seriesConcluidas': FieldValue.increment(sets),
-    });
-  }
-
-  Future<Map<String, dynamic>?> getOnboardingData(String userId) async {
-    final doc = await _firestore
-        .collection('usuarios')
-        .doc(userId)
-        .collection('onboarding')
-        .doc('data')
-        .get();
-    return doc.exists ? doc.data() : null;
-  }
-}
-
-final interstitialAdProvider = Provider((ref) => InterstitialAdService());
-
-class InterstitialAdService {
-  InterstitialAd? interstitialAd;
-  bool isAdLoaded = false;
-  DateTime? lastAdShownTime;
-
-  static const int adCooldownSeconds = 0; // Desativado pra testes
-
-  Future<void> loadInterstitialAd() async {
-    if (isAdLoaded && interstitialAd != null) {
-      debugPrint('Interstitial já carregado');
-      return;
-    }
-    debugPrint('Iniciando carregamento do interstitial');
-
-    await InterstitialAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/1033173712',
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          interstitialAd = ad;
-          isAdLoaded = true;
-          debugPrint('Interstitial carregado');
-        },
-        onAdFailedToLoad: (error) {
-          isAdLoaded = false;
-          debugPrint('Erro no interstitial: $error');
-          interstitialAd = null;
-        },
-      ),
-    );
-  }
-
-  bool canShowAd() {
-    if (!isAdLoaded || interstitialAd == null) {
-      debugPrint('Anúncio não carregado');
-      return false;
-    }
-    if (adCooldownSeconds == 0 || lastAdShownTime == null) {
-      return true;
-    }
-    final now = DateTime.now();
-    final diff = now.difference(lastAdShownTime!).inSeconds;
-    if (diff < adCooldownSeconds) {
-      debugPrint('Cooldown ativo: faltam ${adCooldownSeconds - diff} segundos');
-      return false;
-    }
-    return true;
-  }
-
-  bool showAd() {
-    debugPrint('Tentando exibir interstitial: isAdLoaded=$isAdLoaded');
-    if (canShowAd()) {
-      interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdDismissedFullScreenContent: (ad) {
-          debugPrint('Interstitial fechado');
-          ad.dispose();
-          interstitialAd = null;
-          isAdLoaded = false;
-          loadInterstitialAd();
-        },
-        onAdFailedToShowFullScreenContent: (ad, error) {
-          debugPrint('Erro ao exibir interstitial: $error');
-          ad.dispose();
-          interstitialAd = null;
-          isAdLoaded = false;
-          loadInterstitialAd();
-        },
-      );
-      interstitialAd!.show();
-      debugPrint('Interstitial exibido');
-      lastAdShownTime = DateTime.now();
-      return true;
-    }
-    debugPrint('Falha ao exibir interstitial');
-    return false;
-  }
-
-  void dispose() {
-    interstitialAd?.dispose();
-    interstitialAd = null;
-    isAdLoaded = false;
-  }
-}
+import 'package:video_player/video_player.dart';
 
 class TelaTreino extends ConsumerStatefulWidget {
   const TelaTreino({super.key});
@@ -132,179 +14,115 @@ class TelaTreino extends ConsumerStatefulWidget {
 }
 
 class _TelaTreinoState extends ConsumerState<TelaTreino> {
-  final List<Map<String, dynamic>> exercises = [];
+  final _nomeTreinoController = TextEditingController();
+  List<Map<String, dynamic>> exercises = [];
   String? _selectedExerciseId;
-  final _customExerciseController = TextEditingController();
-  String? _customMuscleGroup;
-  final _setsController = TextEditingController();
-  final _repsController = TextEditingController();
-  final _weightController = TextEditingController();
-  int _restTime = 60;
-  bool _isTimerRunning = false;
-  int _currentTime = 0;
-  int _completedSets = 0;
-  StreamSubscription<bool>? _premiumSubscription;
-  Map<String, dynamic>? _onboardingData;
-  int _estimatedTime = 0;
-  double _estimatedCalories = 0.0;
+  int _series = 3;
+  int _repeticoes = 12;
+  double _carga = 0;
+  int _descanso = 60;
+  VideoPlayerController? _videoController;
 
   @override
   void initState() {
     super.initState();
-    ref.read(interstitialAdProvider).loadInterstitialAd();
-    _loadOnboardingData();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showInterstitial();
-    });
+    _initializeVideoPlayer();
   }
 
-  Future<void> _loadOnboardingData() async {
-    final data = await ref.read(workoutProvider).getOnboardingData(
-          FirebaseAuth.instance.currentUser!.uid,
-        );
-    if (mounted && data != null) {
-      setState(() => _onboardingData = data);
-    }
-  }
-
-  Future<void> _showInterstitial() async {
-    if (!mounted) return;
-    final userId = FirebaseAuth.instance.currentUser!.uid;
-    _premiumSubscription =
-        ref.read(subscriptionProvider).isPremium(userId).listen(
-      (isPremium) {
-        if (!mounted) return;
-        if (!isPremium) {
-          final interstitialAdService = ref.read(interstitialAdProvider);
-          interstitialAdService.showAd();
-        }
-      },
-      onError: (error) {
-        debugPrint('Erro ao verificar premium: $error');
-      },
-    );
-  }
-
-  void _startTimer() {
-    if (!mounted) return;
-    setState(() {
-      _isTimerRunning = true;
-      _currentTime = _restTime;
-    });
-
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!_isTimerRunning || !mounted) return false;
-      setState(() => _currentTime--);
-      if (_currentTime <= 0) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Descanso terminou!')),
-          );
-        }
-        setState(() => _isTimerRunning = false);
-        return false;
-      }
-      return true;
-    });
-  }
-
-  void _estimateWorkout() {
-    int totalTime = 0;
-    double totalCalories = 0;
-    final weight = _onboardingData?['peso']?.toDouble() ?? 70.0;
-
-    for (var ex in exercises) {
-      final sets = ex['series'] as int? ?? 3;
-      final reps = ex['repeticoes'] as int? ?? 12;
-      totalTime += sets * (reps * 3 + _restTime); // 3s por repetição
-      totalCalories += sets * reps * 0.5 * (weight / 70); // Estimativa
-    }
-
-    setState(() {
-      _estimatedTime = totalTime ~/ 60;
-      _estimatedCalories = totalCalories;
-    });
-  }
-
-  void _shareWorkout() {
-    final summary = exercises
-        .map((e) =>
-            "${e['nome']}: ${e['series']} séries, ${e['repeticoes']} reps, ${e['cargaSugerida']} kg${e['weightVariation'] != null ? ' (${e['weightVariation']})' : ''}")
-        .join('\n');
-    Share.share('Meu treino no Esculpo:\n$summary\n💪 #EsculpoApp');
-  }
-
-  Future<void> _salvarTreino() async {
-    try {
-      final workoutService = ref.read(workoutProvider);
-      final interstitialAdService = ref.read(interstitialAdProvider);
-      final isPremium = await ref
-          .read(subscriptionProvider)
-          .isPremium(FirebaseAuth.instance.currentUser!.uid)
-          .first;
-
-      if (exercises.isNotEmpty) {
-        await workoutService.saveWorkout(
-          FirebaseAuth.instance.currentUser!.uid,
-          {
-            'exercicios': exercises,
-            'dataCriacao': FieldValue.serverTimestamp(),
-            'tempoEstimado': _estimatedTime,
-            'caloriasEstimadas': _estimatedCalories,
-          },
-        );
-
-        if (_completedSets > 0) {
-          await workoutService.updateCompletedSets(
-              FirebaseAuth.instance.currentUser!.uid, _completedSets);
-        }
-
-        if (!isPremium && mounted) {
-          interstitialAdService.showAd();
-        }
-      }
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Treino salvo! Parabéns!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
+  Future<void> _initializeVideoPlayer() async {
+    if (_selectedExerciseId != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('exercicios')
+          .doc(_selectedExerciseId)
+          .get();
+      final urlVideo = doc.data()?['urlVideo'] as String?;
+      if (urlVideo != null && urlVideo.isNotEmpty) {
+        _videoController?.dispose();
+        _videoController = VideoPlayerController.networkUrl(Uri.parse(urlVideo))
+          ..initialize().then((_) {
+            if (mounted) setState(() {});
+          });
       }
     }
   }
 
   @override
   void dispose() {
-    _premiumSubscription?.cancel();
-    ref.read(interstitialAdProvider).dispose();
-    _customExerciseController.dispose();
-    _setsController.dispose();
-    _repsController.dispose();
-    _weightController.dispose();
+    _nomeTreinoController.dispose();
+    _videoController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _addExercise() async {
+    if (_selectedExerciseId == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('exercicios')
+        .doc(_selectedExerciseId)
+        .get();
+    final exerciseData = doc.data();
+    if (exerciseData != null && mounted) {
+      setState(() {
+        exercises.add({
+          'id': _selectedExerciseId,
+          'nome': exerciseData['nome'],
+          'series': _series,
+          'repeticoes': _repeticoes,
+          'cargaSugerida': _carga,
+          'tempoDescanso': _descanso,
+        });
+        _selectedExerciseId = null;
+        _series = 3;
+        _repeticoes = 12;
+        _carga = 0;
+        _descanso = 60;
+        _videoController?.dispose();
+        _videoController = null;
+      });
+    }
+  }
+
+  Future<void> _salvarTreino() async {
+    if (exercises.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Adicione pelo menos um exercício')),
+        );
+      }
+      return;
+    }
+
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+    final workoutService = ref.read(workoutProvider);
+    final treino = {
+      'nome': _nomeTreinoController.text.isEmpty
+          ? 'Treino Personalizado'
+          : _nomeTreinoController.text,
+      'exercicios': exercises,
+      'dataCriacao': Timestamp.now(),
+      'caloriasEstimadas': exercises.length * 50,
+    };
+
+    await workoutService.saveWorkout(userId, treino);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Treino salvo com sucesso')),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _shareWorkout() async {
+    final workoutText = exercises
+        .map((e) =>
+            '${e['nome']}: ${e['series']} séries, ${e['repeticoes']} reps, ${e['cargaSugerida']}kg')
+        .join('\n');
+    await Share.share('Meu treino:\n$workoutText');
   }
 
   @override
   Widget build(BuildContext context) {
-    final exercisesStream = ref.watch(exerciseProvider).getExercises();
-    final experienceLevel = _onboardingData?['experiencia'] ?? 'Iniciante';
-    final suggestedReps = experienceLevel == 'Sim, regularmente'
-        ? 12
-        : experienceLevel == 'Sim, >6 meses'
-            ? 10
-            : 8;
-    final suggestedWeightMultiplier = experienceLevel == 'Sim, regularmente'
-        ? 0.5
-        : experienceLevel == 'Sim, >6 meses'
-            ? 0.7
-            : 0.9;
+    final exercisesAsync = ref.watch(exerciseProvider).getExercises(null);
 
     return Scaffold(
       appBar: AppBar(
@@ -320,212 +138,119 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            TextField(
+              controller: _nomeTreinoController,
+              decoration: const InputDecoration(labelText: 'Nome do Treino'),
+            ),
+            const SizedBox(height: 16),
             StreamBuilder<List<Map<String, dynamic>>>(
-              stream: exercisesStream,
+              stream: exercisesAsync,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const CircularProgressIndicator();
                 }
                 if (snapshot.hasError) {
-                  debugPrint(
-                      'Erro no StreamBuilder (Workout): ${snapshot.error}');
-                  return const Center(
-                      child: Text('Erro ao carregar exercícios'));
+                  return const Text('Erro ao carregar exercícios');
                 }
-
-                final exerciseItems =
-                    snapshot.hasData && snapshot.data!.isNotEmpty
-                        ? snapshot.data!
-                            .map((e) => DropdownMenuItem<String>(
-                                  value: e['id'],
-                                  child: Text(e['nome'] ?? 'Sem nome'),
-                                ))
-                            .toList()
-                        : <DropdownMenuItem<String>>[];
-
-                return DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Exercício'),
+                final exList = snapshot.data ?? [];
+                return DropdownButton<String>(
                   value: _selectedExerciseId,
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: '',
-                      child: Text('Selecione um exercício'),
-                    ),
-                    ...exerciseItems,
-                  ],
+                  hint: const Text('Selecione um exercício'),
+                  isExpanded: true,
+                  items: exList
+                      .map((e) => DropdownMenuItem<String>(
+                            value: e['id'] as String,
+                            child: Text(e['nome'] ?? 'Sem nome'),
+                          ))
+                      .toList(),
                   onChanged: (value) {
-                    if (mounted) {
-                      setState(() =>
-                          _selectedExerciseId = value == '' ? null : value);
-                    }
+                    setState(() {
+                      _selectedExerciseId = value;
+                      _initializeVideoPlayer();
+                    });
                   },
                 );
               },
             ),
-            TextFormField(
-              controller: _customExerciseController,
-              decoration: const InputDecoration(
-                  labelText: 'Exercício Personalizado (opcional)'),
-            ),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                  labelText: 'Grupo Muscular (para personalizado)'),
-              value: _customMuscleGroup,
-              items: [
-                'Peito',
-                'Costas',
-                'Pernas',
-                'Braços',
-                'Ombros',
-                'Abdômen'
-              ]
-                  .map((muscle) =>
-                      DropdownMenuItem(value: muscle, child: Text(muscle)))
-                  .toList(),
-              onChanged: (value) {
-                if (mounted) {
-                  setState(() => _customMuscleGroup = value);
-                }
-              },
-            ),
-            TextField(
-              controller: _setsController,
-              decoration: const InputDecoration(labelText: 'Séries'),
-              keyboardType: TextInputType.number,
-            ),
-            TextField(
-              controller: _repsController,
-              decoration: InputDecoration(
-                labelText: 'Repetições (sugerido: $suggestedReps)',
+            const SizedBox(height: 16),
+            if (_videoController != null &&
+                _videoController!.value.isInitialized)
+              AspectRatio(
+                aspectRatio: _videoController!.value.aspectRatio,
+                child: VideoPlayer(_videoController!),
               ),
-              keyboardType: TextInputType.number,
-            ),
-            TextField(
-              controller: _weightController,
-              decoration: const InputDecoration(labelText: 'Carga (kg)'),
-              keyboardType: TextInputType.number,
-            ),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Descanso (s): '),
                 Expanded(
-                  child: Slider(
-                    value: _restTime.toDouble(),
-                    min: 30,
-                    max: 180,
-                    divisions: 15,
-                    label: _restTime.toString(),
-                    onChanged: (value) {
-                      if (mounted) {
-                        setState(() => _restTime = value.round());
-                      }
-                    },
+                  child: TextField(
+                    decoration: const InputDecoration(labelText: 'Séries'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) =>
+                        _series = int.tryParse(value) ?? _series,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(labelText: 'Repetições'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) =>
+                        _repeticoes = int.tryParse(value) ?? _repeticoes,
                   ),
                 ),
               ],
             ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(labelText: 'Carga (kg)'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) =>
+                        _carga = double.tryParse(value) ?? _carga,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    decoration:
+                        const InputDecoration(labelText: 'Descanso (seg)'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) =>
+                        _descanso = int.tryParse(value) ?? _descanso,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () async {
-                String? exerciseName;
-                if (_customExerciseController.text.isNotEmpty) {
-                  exerciseName = _customExerciseController.text;
-                } else if (_selectedExerciseId != null) {
-                  final doc = await FirebaseFirestore.instance
-                      .collection('exercicios')
-                      .doc(_selectedExerciseId)
-                      .get();
-                  exerciseName = doc.data()?['nome'] as String?;
-                }
-
-                if (exerciseName == null) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Selecione ou insira um exercício')),
-                    );
-                    return;
-                  }
-                }
-
-                final sets = int.tryParse(_setsController.text) ?? 3;
-                final reps =
-                    int.tryParse(_repsController.text) ?? suggestedReps;
-                final weight = double.tryParse(_weightController.text) ?? 0.0;
-                final suggestedWeight = weight * suggestedWeightMultiplier;
-                final weightVariation = weight > suggestedWeight
-                    ? '↑'
-                    : weight < suggestedWeight
-                        ? '↓'
-                        : '=';
-
-                final exercise = {
-                  'id': _selectedExerciseId ??
-                      'custom_${DateTime.now().millisecondsSinceEpoch}',
-                  'nome': exerciseName,
-                  'grupoMuscular': _customMuscleGroup ?? 'Desconhecido',
-                  'series': sets,
-                  'repeticoes': reps,
-                  'cargaSugerida': weight,
-                  'suggestedWeight': suggestedWeight,
-                  'weightVariation': weightVariation,
-                };
-
-                setState(() {
-                  exercises.add(exercise);
-                  _selectedExerciseId = null;
-                  _customExerciseController.clear();
-                  _customMuscleGroup = null;
-                  _setsController.clear();
-                  _repsController.clear();
-                  _weightController.clear();
-                  _estimateWorkout();
-                });
-              },
+              onPressed: _addExercise,
               child: const Text('Adicionar Exercício'),
             ),
-            if (_estimatedTime > 0) Text('Tempo estimado: $_estimatedTime min'),
-            if (_estimatedCalories > 0)
-              Text(
-                  'Calorias estimadas: ${_estimatedCalories.toStringAsFixed(1)} kcal'),
+            const SizedBox(height: 16),
             Expanded(
               child: ListView.builder(
                 itemCount: exercises.length,
                 itemBuilder: (context, index) {
                   final ex = exercises[index];
                   return ListTile(
-                    title: Text(ex['nome'] as String),
+                    title: Text(ex['nome'] ?? 'Sem nome'),
                     subtitle: Text(
-                      '${ex['series']} séries, ${ex['repeticoes']} reps, ${ex['cargaSugerida']} kg (${ex['weightVariation']})',
-                    ),
+                        '${ex['series']} séries, ${ex['repeticoes']} reps, ${ex['cargaSugerida']}kg, ${ex['tempoDescanso']}s'),
                     trailing: IconButton(
-                      icon: Icon(
-                        ex['concluido'] == true
-                            ? Icons.check_circle
-                            : Icons.check,
-                      ),
+                      icon: const Icon(Icons.delete),
                       onPressed: () {
-                        if (!mounted) return;
                         setState(() {
-                          final isCompleted = ex['concluido'] == true;
-                          ex['concluido'] = !isCompleted;
-                          if (!isCompleted) {
-                            _completedSets += ex['series'] as int;
-                          } else {
-                            _completedSets -= ex['series'] as int;
-                          }
+                          exercises.removeAt(index);
                         });
-                        if (!_isTimerRunning && ex['concluido'] == true) {
-                          _startTimer();
-                        }
                       },
                     ),
                   );
                 },
               ),
             ),
-            if (_isTimerRunning)
-              Text('Descanso: $_currentTime s',
-                  style: const TextStyle(fontSize: 20)),
             ElevatedButton(
               onPressed: _salvarTreino,
               child: const Text('Salvar Treino'),

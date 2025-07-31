@@ -1,45 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/subscription_service.dart';
-import 'tela_treino.dart';
-
-final exerciseProvider = Provider((ref) => ExerciseService());
-
-class ExerciseService {
-  Stream<List<Map<String, dynamic>>> getExercises(
-      {String? grupoMuscularFiltro}) {
-    Query query = FirebaseFirestore.instance.collection('exercicios');
-    if (grupoMuscularFiltro != null && grupoMuscularFiltro.isNotEmpty) {
-      query = query.where('grupoMuscular', isEqualTo: grupoMuscularFiltro);
-    }
-    return query.snapshots().map(
-          (snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>?;
-            if (data == null) {
-              return {
-                'id': doc.id,
-                'nome': 'Sem nome',
-                'grupoMuscular': 'Desconhecido',
-                'nivel': 'Iniciante',
-                'descricao': '',
-                'urlVideo': '',
-              };
-            }
-            return {
-              'id': doc.id,
-              'nome': data['nome'] ?? 'Sem nome',
-              'grupoMuscular': data['grupoMuscular'] ?? 'Desconhecido',
-              'nivel': data['nivel'] ?? 'Iniciante',
-              'descricao': data['descricao'] ?? '',
-              'urlVideo': data['urlVideo'] ?? '',
-            };
-          }).toList(),
-        );
-  }
-}
+import 'package:guarda_corpo_2024/providers/providers.dart';
+import 'package:video_player/video_player.dart';
 
 class TelaExercicios extends ConsumerStatefulWidget {
   const TelaExercicios({super.key});
@@ -50,109 +12,96 @@ class TelaExercicios extends ConsumerStatefulWidget {
 
 class _TelaExerciciosState extends ConsumerState<TelaExercicios> {
   String? _selectedMuscleGroup;
-  StreamSubscription<bool>? _premiumSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    ref.read(interstitialAdProvider).loadInterstitialAd();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showInterstitial();
-    });
-  }
-
-  Future<void> _showInterstitial() async {
-    if (!mounted) return;
-    final userId = FirebaseAuth.instance.currentUser!.uid;
-    _premiumSubscription =
-        ref.read(subscriptionProvider).isPremium(userId).listen(
-      (isPremium) {
-        if (!mounted) return;
-        if (!isPremium) {
-          final interstitialAdService = ref.read(interstitialAdProvider);
-          interstitialAdService.showAd();
-        }
-      },
-      onError: (error) {
-        debugPrint('Erro ao verificar premium: $error');
-      },
-    );
-  }
+  VideoPlayerController? _videoController;
 
   @override
   void dispose() {
-    _premiumSubscription?.cancel();
+    _videoController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeVideoPlayer(String? urlVideo) async {
+    if (urlVideo != null && urlVideo.isNotEmpty) {
+      _videoController?.dispose();
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(urlVideo))
+        ..initialize().then((_) {
+          if (mounted) setState(() {});
+        });
+    } else {
+      _videoController?.dispose();
+      _videoController = null;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final exercisesStream = ref.watch(exerciseProvider).getExercises(
-          grupoMuscularFiltro: _selectedMuscleGroup,
-        );
+    final exercisesAsync =
+        ref.watch(exerciseProvider).getExercises(_selectedMuscleGroup);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Exercícios')),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                  labelText: 'Filtrar por Grupo Muscular'),
+            padding: const EdgeInsets.all(16.0),
+            child: DropdownButton<String>(
               value: _selectedMuscleGroup,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Todos')),
-                ...['Peito', 'Costas', 'Pernas', 'Braços', 'Ombros', 'Abdômen']
-                    .map((muscle) =>
-                        DropdownMenuItem(value: muscle, child: Text(muscle))),
+              hint: const Text('Selecione o grupo muscular'),
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Todos')),
+                DropdownMenuItem(value: 'Peito', child: Text('Peito')),
+                DropdownMenuItem(value: 'Costas', child: Text('Costas')),
+                DropdownMenuItem(value: 'Pernas', child: Text('Pernas')),
+                DropdownMenuItem(value: 'Braços', child: Text('Braços')),
+                DropdownMenuItem(value: 'Ombros', child: Text('Ombros')),
+                DropdownMenuItem(value: 'Abdômen', child: Text('Abdômen')),
               ],
-              onChanged: (value) =>
-                  setState(() => _selectedMuscleGroup = value),
+              onChanged: (value) {
+                setState(() {
+                  _selectedMuscleGroup = value;
+                });
+              },
             ),
           ),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: exercisesStream,
+              stream: exercisesAsync,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  debugPrint(
-                      'Erro no StreamBuilder (Exercícios): ${snapshot.error}');
                   return const Center(
                       child: Text('Erro ao carregar exercícios'));
                 }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                final exercises = snapshot.data ?? [];
+                if (exercises.isEmpty) {
                   return const Center(
                       child: Text('Nenhum exercício encontrado'));
                 }
-                final exercises = snapshot.data!;
                 return ListView.builder(
                   itemCount: exercises.length,
                   itemBuilder: (context, index) {
-                    final ex = exercises[index];
-                    return Card(
-                      child: ListTile(
-                        title: Text(ex['nome'] ?? 'Sem nome'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                'Grupo: ${ex['grupoMuscular'] ?? 'Desconhecido'}'),
-                            Text('Nível: ${ex['nivel']}'),
-                            if ((ex['descricao'] as String?)?.isNotEmpty ==
-                                true)
-                              Text('Descrição: ${ex['descricao']}'),
-                          ],
-                        ),
-                      ),
+                    final exercise = exercises[index];
+                    return ListTile(
+                      title: Text(exercise['nome'] ?? 'Sem nome'),
+                      subtitle: Text(exercise['grupoMuscular'] ?? 'Sem grupo'),
+                      onTap: () {
+                        _initializeVideoPlayer(exercise['urlVideo']);
+                      },
                     );
                   },
                 );
               },
             ),
           ),
+          if (_videoController != null && _videoController!.value.isInitialized)
+            AspectRatio(
+              aspectRatio: _videoController!.value.aspectRatio,
+              child: VideoPlayer(_videoController!),
+            ),
         ],
       ),
     );

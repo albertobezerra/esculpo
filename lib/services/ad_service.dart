@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:guarda_corpo_2024/services/subscription_service.dart';
 
 final adProvider = Provider((ref) => AdService());
 
@@ -38,99 +36,5 @@ class AdService {
 
   void dispose() {
     bannerAd?.dispose();
-  }
-}
-
-class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  @override
-  void initState() {
-    super.initState();
-    ref.read(adProvider).loadBannerAd();
-  }
-
-  @override
-  void dispose() {
-    ref.read(adProvider).dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final adService = ref.watch(adProvider);
-    final userId = FirebaseAuth.instance.currentUser!.uid;
-    final isPremium = ref.watch(subscriptionProvider).isPremium(userId);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Esculpo')),
-      body: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Você tá ficando mais forte! 💪',
-                    style: TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/create-workout');
-                    },
-                    child: const Text('Criar Treino'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/exercises');
-                    },
-                    child: const Text('Ver Exercícios'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/profile');
-                    },
-                    child: const Text('Perfil'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/subscription');
-                    },
-                    child: const Text('Assinatura'),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
-          StreamBuilder<bool>(
-            stream: isPremium,
-            builder: (context, snapshot) {
-              if (snapshot.data == true || !adService.isBannerLoaded) {
-                return const SizedBox();
-              }
-              debugPrint('Exibindo banner: ${adService.bannerAd}');
-              return adService.bannerAd != null
-                  ? SizedBox(
-                      height: adService.bannerAd!.size.height.toDouble(),
-                      width: adService.bannerAd!.size.width.toDouble(),
-                      child: AdWidget(ad: adService.bannerAd!),
-                    )
-                  : const SizedBox();
-            },
-          ),
-        ],
-      ),
-    );
   }
 }
