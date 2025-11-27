@@ -36,14 +36,46 @@ class _TelaPlanosTreinoState extends ConsumerState<TelaPlanosTreino> {
                             child: Text('$days dias'),
                           ))
                       .toList(),
-                  onChanged: (value) {
+                  onChanged: (value) async {
                     setState(() {
                       _selectedDays = value!;
                     });
-                    ref.read(planGeneratorServiceProvider).generateTrainingPlan(
-                          userId,
-                          customDays: _selectedDays,
+
+                    // Mostra loading
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const AlertDialog(
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 16),
+                            Text('Gerando plano personalizado...'),
+                          ],
+                        ),
+                      ),
+                    );
+
+                    try {
+                      await ref.read(geradorTreinosProvider).gerarPlanoCompleto(
+                            usuarioId: userId,
+                          );
+
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Plano atualizado!')),
                         );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erro: $e')),
+                        );
+                      }
+                    }
                   },
                 ),
               ],

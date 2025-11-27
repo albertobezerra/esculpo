@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:guarda_corpo_2024/services/subscription_service.dart';
+import 'package:guarda_corpo_2024/servicos/subscription_service.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ProfileScreen extends ConsumerWidget {

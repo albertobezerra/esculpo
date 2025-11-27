@@ -23,7 +23,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "albertobezerra.esculpo"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -37,8 +37,8 @@ android {
 
     defaultConfig {
         applicationId = "albertobezerra.esculpo"
-        minSdk = 23
-        targetSdk = 35
+        minSdkVersion = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = 3
         versionName = "1.1"
         multiDexEnabled true
