@@ -4,12 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
 import 'screens/tela_login.dart';
 import 'screens/tela_splash.dart';
-import 'firebase_options.dart'; // Certifique-se de ter isso gerado com flutterfire configure
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        AppStrings.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -33,8 +36,9 @@ class MyApp extends StatelessWidget {
       supportedLocales: const [
         Locale('pt', 'BR'),
       ],
+      locale: const Locale('pt', 'BR'),
       title: 'Esculpo',
-      theme: AppTheme.theme,
+      theme: AppTheme.lightTheme, // CORRIGIDO
       home: const TelaSplash(),
       routes: {
         '/tela_login': (context) => const TelaLogin(),
@@ -54,25 +58,48 @@ class AuthWrapper extends ConsumerWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Scaffold(
+            backgroundColor: AppColors.backgroundLight,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primaryGreen,
+              ),
+            ),
+          );
         }
         if (snapshot.hasError) {
-          return const Center(child: Text('Erro ao verificar autenticação'));
+          return const Scaffold(
+            backgroundColor: AppColors.backgroundLight,
+            body: Center(
+              child: Text('Erro ao verificar autenticação'),
+            ),
+          );
         }
         if (snapshot.hasData) {
           final userId = snapshot.data!.uid;
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
-                .collection('usuarios') // Ajustado pra 'usuarios'
+                .collection('usuarios')
                 .doc(userId)
                 .get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const Scaffold(
+                  backgroundColor: AppColors.backgroundLight,
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryGreen,
+                    ),
+                  ),
+                );
               }
               if (snapshot.hasError) {
-                return const Center(
-                    child: Text('Erro ao carregar dados do usuário'));
+                return const Scaffold(
+                  backgroundColor: AppColors.backgroundLight,
+                  body: Center(
+                    child: Text('Erro ao carregar dados do usuário'),
+                  ),
+                );
               }
               if (snapshot.hasData && snapshot.data!.exists) {
                 final data = snapshot.data!.data() as Map<String, dynamic>?;

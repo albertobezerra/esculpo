@@ -1,11 +1,9 @@
+// lib/screens/tela_inicial.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:guarda_corpo_2024/providers/providers.dart';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:syncfusion_flutter_gauges/gauges.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -15,6 +13,9 @@ import 'tela_historico_treinos.dart';
 import 'tela_exercicios.dart';
 import 'tela_detalhe_treino.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
+import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
+import 'package:guarda_corpo_2024/providers/providers.dart';
+import 'dart:math' as math;
 
 class TelaInicial extends StatefulWidget {
   const TelaInicial({super.key});
@@ -34,68 +35,61 @@ class _TelaInicialState extends State<TelaInicial> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final barWidth = screenWidth * 0.64;
-    final leftOffset = (screenWidth - barWidth) / 2;
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _selectedIndex,
-            children: _pages,
-          ),
-          Positioned(
-            left: leftOffset > 20 ? leftOffset : 20,
-            bottom: 30,
-            child: SizedBox(
-              width: barWidth,
-              height: 70,
-              child: Material(
-                color: const Color(0xFF9D291A),
-                borderRadius: const BorderRadius.all(Radius.circular(35)),
-                elevation: 20,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(child: _buildNavIcon(Icons.home, 0)),
-                    Expanded(child: _buildNavIcon(Icons.calendar_today, 1)),
-                    Expanded(child: _buildNavIcon(Icons.history, 2)),
-                    Expanded(child: _buildNavIcon(Icons.directions_run, 3)),
-                  ],
-                ),
-              ),
+      backgroundColor: AppColors.backgroundLight,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.cardWhite,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavIcon(Icons.home_outlined, Icons.home, 0),
+                _buildNavIcon(
+                    Icons.calendar_today_outlined, Icons.calendar_today, 1),
+                _buildNavIcon(Icons.history_outlined, Icons.history, 2),
+                _buildNavIcon(
+                    Icons.fitness_center_outlined, Icons.fitness_center, 3),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildNavIcon(IconData icon, int index) {
+  Widget _buildNavIcon(IconData outlinedIcon, IconData filledIcon, int index) {
     final isSelected = _selectedIndex == index;
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.white : null,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(
-          icon,
-          color: isSelected ? const Color(0xFF9D291A) : Colors.white70,
-          size: 30,
+    return GestureDetector(
+      onTap: () => setState(() => _selectedIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        child: Icon(
+          isSelected ? filledIcon : outlinedIcon,
+          color: isSelected ? AppColors.textDark : AppColors.textLight,
+          size: 28,
         ),
-        onPressed: () {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
       ),
     );
   }
 }
+
+// ===== CONTEÚDO DA TELA INICIAL =====
 
 class TelaInicialContent extends ConsumerStatefulWidget {
   const TelaInicialContent({super.key});
@@ -105,13 +99,10 @@ class TelaInicialContent extends ConsumerStatefulWidget {
 }
 
 class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
-  bool hasNotification = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
-
-  // Cache e controle de rebuild
   int _rebuildKey = 0;
   final Map<String, Future<Map<String, dynamic>?>> _workoutCache = {};
 
@@ -127,56 +118,25 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
     final imagePath = path.join(directory.path, 'profile_image.jpg');
     final file = File(imagePath);
     if (await file.exists()) {
-      setState(() {
-        _profileImage = file;
-      });
+      setState(() => _profileImage = file);
     }
   }
 
   Future<void> _saveProfileImage(File image) async {
     final directory = await getApplicationDocumentsDirectory();
     final imagePath = path.join(directory.path, 'profile_image.jpg');
-    final file = File(imagePath);
-    await image.copy(file.path);
-    setState(() {
-      _profileImage = file;
-    });
+    await image.copy(imagePath);
+    setState(() => _profileImage = File(imagePath));
   }
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      final file = File(pickedFile.path);
-      await _saveProfileImage(file);
+      await _saveProfileImage(File(pickedFile.path));
     }
   }
 
-  Future<void> _showChangePhotoDialog() async {
-    return showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Alterar Foto'),
-        content: const Text('Deseja alterar a foto de perfil?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Não'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _pickImage();
-            },
-            child: const Text('Sim'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _clearCache() {
-    _workoutCache.clear();
-  }
+  void _clearCache() => _workoutCache.clear();
 
   Future<Map<String, dynamic>?> _getCachedWorkout(DateTime date) {
     final key = '${date.year}-${date.month}-${date.day}';
@@ -208,15 +168,11 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
 
       if (!planSnapshot.exists) {
         try {
-          debugPrint('🔄 Gerando plano inicial...');
           await ref.read(geradorTreinosProvider).gerarPlanoCompleto(
                 usuarioId: userId,
               );
-          debugPrint('✅ Plano gerado!');
           _clearCache();
-          setState(() {
-            _rebuildKey++;
-          });
+          setState(() => _rebuildKey++);
         } catch (e) {
           debugPrint('❌ Erro ao gerar plano: $e');
         }
@@ -243,7 +199,6 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
 
       return workout;
     } catch (e) {
-      debugPrint('Erro ao obter treino: $e');
       return {
         'tipo': 'Erro',
         'musculos': 'ERRO',
@@ -293,464 +248,576 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
         'tempoCardio': tempoCardio
       };
     } catch (e) {
-      debugPrint('Erro ao obter progresso: $e');
       return {'calorias': 0.0, 'pesoLevantado': 0.0, 'tempoCardio': 0.0};
     }
   }
 
-  Widget _buildDayCard(
-      DateTime date, String treino, double porcentagem, Color backgroundColor,
-      {Color textColor = Colors.black,
-      Color? borderColor,
-      required DateTime now}) {
-    String porcentagemTexto = '${porcentagem.toStringAsFixed(0)}%';
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final DateTime now = DateTime.now();
+    final int hour = now.hour;
 
-    return GestureDetector(
-      onTap: () async {
-        final workout = await _getCachedWorkout(date);
-        if (workout != null &&
-            (workout['treinos'] as List?)?.isNotEmpty == true) {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TelaDetalheTreino(workout: workout),
-              ),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Dia de descanso'),
-                  duration: Duration(seconds: 1)),
-            );
-          }
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: borderColor != null
-              ? Border.all(color: borderColor, width: 2)
-              : null,
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                '${date.day}',
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-              Text(
-                treino,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                porcentagemTexto,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-            ],
+    String greeting;
+    String emoji;
+    if (hour >= 6 && hour < 12) {
+      greeting = strings.goodMorning;
+      emoji = '🔥';
+    } else if (hour >= 12 && hour < 18) {
+      greeting = strings.goodAfternoon;
+      emoji = '☀️';
+    } else {
+      greeting = strings.goodEvening;
+      emoji = '🌙';
+    }
+
+    final userName = user?.displayName ?? 'User';
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // HEADER FIXO
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: _buildHeader(greeting, emoji, userName),
           ),
-        ),
+
+          // CONTEÚDO SCROLLÁVEL
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+
+                  // PROGRESS CARD
+                  _buildProgressCard(strings),
+                  const SizedBox(height: 24),
+
+                  // CALENDÁRIO DE TREINOS
+                  _buildWorkoutCalendar(strings, now),
+                  const SizedBox(height: 24),
+
+                  // MÉTRICAS/PROGRESSO
+                  _buildMetrics(strings),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildGauge(String title, double value, double maxValue, String label,
-      String description) {
-    return Column(
+  Widget _buildHeader(String greeting, String emoji, String userName) {
+    return Row(
       children: [
-        SizedBox(
-          width: 100,
-          height: 100,
-          child: SfRadialGauge(
-            axes: <RadialAxis>[
-              RadialAxis(
-                minimum: 0,
-                maximum: maxValue,
-                showLabels: false,
-                showTicks: false,
-                ranges: <GaugeRange>[
-                  GaugeRange(
-                    startValue: 0,
-                    endValue: value,
-                    color: AppTheme.theme.colorScheme.secondary,
-                  ),
-                  GaugeRange(
-                    startValue: value,
-                    endValue: maxValue,
-                    color: AppTheme.theme.colorScheme.surface.withAlpha(77),
-                  ),
-                ],
-                pointers: <GaugePointer>[
-                  RangePointer(
-                    value: value,
-                    width: 0.1,
-                    sizeUnit: GaugeSizeUnit.factor,
-                    color: AppTheme.theme.colorScheme.secondary,
-                  ),
-                ],
-                annotations: <GaugeAnnotation>[
-                  GaugeAnnotation(
-                    widget: Text(label,
-                        style: GoogleFonts.bebasNeue(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF9D291A))),
-                    angle: 90,
-                    positionFactor: 0.5,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(description,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.bebasNeue(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF9D291A))),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final DateTime now = DateTime.now();
-    final String formattedDate =
-        DateFormat('EEE, dd \'DE\' MMMM \'DE\' yyyy', 'pt_BR')
-            .format(now)
-            .toUpperCase();
-    final int hour = now.hour;
-    String greeting = 'Bom dia,';
-    if (hour >= 12 && hour < 18) {
-      greeting = 'Boa tarde,';
-    } else if (hour >= 18 || hour < 6) {
-      greeting = 'Boa noite,';
-    }
-    final userName = user?.displayName ?? 'Usuário';
-
-    return SingleChildScrollView(
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: _profileImage == null
-                        ? _pickImage
-                        : _showChangePhotoDialog,
-                    child: CircleAvatar(
-                      radius: 30,
-                      backgroundColor: const Color(0xFF9D291A),
-                      foregroundImage: _profileImage != null
-                          ? FileImage(_profileImage!)
-                          : null,
-                      child: _profileImage == null
-                          ? const Icon(Icons.add_a_photo_outlined,
-                              size: 30, color: Colors.white)
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          greeting.toUpperCase(),
-                          style: GoogleFonts.bebasNeue(
-                            color: Colors.black,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+        GestureDetector(
+          onTap: _profileImage == null
+              ? _pickImage
+              : () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(
+                        Localizations.localeOf(context).languageCode == 'pt'
+                            ? 'Alterar foto'
+                            : 'Change photo',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            Localizations.localeOf(context).languageCode == 'pt'
+                                ? 'Cancelar'
+                                : 'Cancel',
                           ),
                         ),
-                        Text(
-                          userName.toUpperCase(),
-                          style: GoogleFonts.bebasNeue(
-                            color: const Color(0xFF9D291A),
-                            fontSize: 28,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          formattedDate,
-                          style: GoogleFonts.bebasNeue(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _pickImage();
+                          },
+                          child: Text(
+                            Localizations.localeOf(context).languageCode == 'pt'
+                                ? 'Alterar'
+                                : 'Change',
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: hasNotification
-                        ? const Color(0xFF9D291A)
-                        : AppTheme.theme.colorScheme.surface,
-                    child: IconButton(
-                      icon: const Icon(Icons.notifications,
-                          color: Color.fromARGB(255, 225, 225, 225), size: 20),
-                      onPressed: () {
-                        setState(() {
-                          hasNotification = !hasNotification;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'HOJE É DIA DE TREINAR'.toUpperCase(),
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FutureBuilder<Map<String, dynamic>?>(
-                key: ValueKey(_rebuildKey),
-                future: _getCachedWorkout(now),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Container(
-                      width: double.infinity,
-                      height: 110,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9D291A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                    );
-                  }
-
-                  final workout = snapshot.data;
-                  final musculos = workout?['musculos'] ?? 'SEM TREINO';
-                  final temExercicios =
-                      (workout?['treinos'] as List?)?.isNotEmpty ?? false;
-
-                  return GestureDetector(
-                    onTap: temExercicios
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    TelaDetalheTreino(workout: workout!),
-                              ),
-                            );
-                          }
-                        : null,
-                    child: Container(
-                      width: double.infinity,
-                      height: 110,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9D291A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          musculos,
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 24,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
                   );
                 },
-              ),
-              const SizedBox(height: 20),
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              image: _profileImage != null
+                  ? DecorationImage(
+                      image: FileImage(_profileImage!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+              gradient: _profileImage == null
+                  ? const LinearGradient(
+                      colors: [AppColors.primaryGreen, AppColors.primaryPurple],
+                    )
+                  : null,
+            ),
+            child: _profileImage == null
+                ? const Icon(Icons.person, color: Colors.white, size: 28)
+                : null,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'CALENDÁRIO DE TREINOS'.toUpperCase(),
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                ),
+                '$greeting $emoji',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textGray,
+                    ),
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 150,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              Text(
+                userName,
+                style: Theme.of(context).textTheme.headlineMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: () {},
+          icon: const Icon(Icons.notifications_outlined),
+          color: AppColors.textDark,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressCard(AppStrings strings) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      key: ValueKey(_rebuildKey),
+      future: _getCachedWorkout(DateTime.now()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildProgressCardSkeleton();
+        }
+
+        final workout = snapshot.data;
+        final musculos =
+            workout?['musculos'] ?? strings.noWorkout.toUpperCase();
+        final porcentagem =
+            (workout?['porcentagem'] as num?)?.toDouble() ?? 0.0;
+        final temExercicios =
+            (workout?['treinos'] as List?)?.isNotEmpty ?? false;
+        final tempoEstimado = workout?['tempoEstimado'] ?? 0;
+
+        return GestureDetector(
+          onTap: temExercicios
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TelaDetalheTreino(workout: workout!),
+                    ),
+                  );
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.cardWhite,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppTheme.cardShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strings.todayWorkout,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 20),
+                Row(
                   children: [
-                    Expanded(
-                      child: FutureBuilder<Map<String, dynamic>?>(
-                        key: ValueKey('${_rebuildKey}_prev'),
-                        future: _getCachedWorkout(
-                            now.subtract(const Duration(days: 1))),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          final data = snapshot.data ??
-                              {'musculos': 'Descanso', 'porcentagem': 0.0};
-                          return _buildDayCard(
-                            now.subtract(const Duration(days: 1)),
-                            data['musculos'],
-                            data['porcentagem'],
-                            Colors.white,
-                            textColor: const Color(0xFF9D291A),
-                            borderColor: const Color(0xFF9D291A),
-                            now: now,
-                          );
-                        },
+                    // CIRCULAR PROGRESS
+                    SizedBox(
+                      width: 90,
+                      height: 90,
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: const Size(90, 90),
+                            painter: CircularProgressPainter(
+                              progress: porcentagem / 100,
+                              color: AppColors.primaryGreen,
+                            ),
+                          ),
+                          Center(
+                            child: Text(
+                              '${porcentagem.toStringAsFixed(0)}%',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 20),
+                    // INFO
                     Expanded(
-                      child: FutureBuilder<Map<String, dynamic>?>(
-                        key: ValueKey('${_rebuildKey}_today'),
-                        future: _getCachedWorkout(now),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          final data = snapshot.data ??
-                              {'musculos': 'Sem treino', 'porcentagem': 0.0};
-                          return _buildDayCard(
-                            now,
-                            data['musculos'],
-                            data['porcentagem'],
-                            const Color(0xFF9D291A),
-                            textColor: Colors.white,
-                            now: now,
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FutureBuilder<Map<String, dynamic>?>(
-                        key: ValueKey('${_rebuildKey}_next'),
-                        future:
-                            _getCachedWorkout(now.add(const Duration(days: 1))),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          final data = snapshot.data ??
-                              {'musculos': 'Sem treino', 'porcentagem': 0.0};
-                          return _buildDayCard(
-                            now.add(const Duration(days: 1)),
-                            data['musculos'],
-                            data['porcentagem'],
-                            Colors.white,
-                            textColor: const Color(0xFF9D291A),
-                            borderColor: const Color(0xFF9D291A),
-                            now: now,
-                          );
-                        },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            musculos,
+                            style: Theme.of(context).textTheme.titleMedium,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          if (tempoEstimado > 0)
+                            Row(
+                              children: [
+                                Icon(Icons.access_time,
+                                    size: 16, color: AppColors.textGray),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$tempoEstimado ${strings.minutes}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'PROGRESSO'.toUpperCase(),
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-              FutureBuilder<Map<String, double>>(
-                key: ValueKey('${_rebuildKey}_progress'),
-                future: _getProgressData(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final progress = snapshot.data ??
-                      {
-                        'calorias': 0.0,
-                        'pesoLevantado': 0.0,
-                        'tempoCardio': 0.0
-                      };
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: _buildGauge(
-                            'Calorias',
-                            progress['calorias']!,
-                            500,
-                            progress['calorias']!.toStringAsFixed(0),
-                            'Calorias'),
+                if (temExercicios) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                TelaDetalheTreino(workout: workout!),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow, size: 20),
+                      label: Text(strings.continueWorkout),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.textDark,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      Expanded(
-                        child: _buildGauge(
-                            'Peso',
-                            progress['pesoLevantado']!,
-                            200,
-                            '${progress['pesoLevantado']!.toStringAsFixed(0)}kg',
-                            'Peso levantado'),
-                      ),
-                      Expanded(
-                        child: _buildGauge(
-                            'Tempo',
-                            progress['tempoCardio']!,
-                            60,
-                            '${progress['tempoCardio']!.toStringAsFixed(0)}min',
-                            'Tempo treino'),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 100),
-            ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProgressCardSkeleton() {
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryGreen),
+      ),
+    );
+  }
+
+  Widget _buildWorkoutCalendar(AppStrings strings, DateTime now) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          strings.workoutCalendar,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDayCard(
+                now.subtract(const Duration(days: 1)),
+                strings.yesterday,
+                false,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDayCard(now, strings.today, true),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDayCard(
+                now.add(const Duration(days: 1)),
+                strings.tomorrow,
+                false,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDayCard(DateTime date, String label, bool isToday) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      key: ValueKey('${_rebuildKey}_${date.day}'),
+      future: _getCachedWorkout(date),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildDayCardSkeleton(isToday);
+        }
+
+        final data = snapshot.data;
+        final musculos = data?['musculos'] ?? 'Descanso';
+        final porcentagem = (data?['porcentagem'] as num?)?.toDouble() ?? 0.0;
+
+        return GestureDetector(
+          onTap: () async {
+            if (data != null &&
+                (data['treinos'] as List?)?.isNotEmpty == true) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TelaDetalheTreino(workout: data),
+                ),
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isToday ? AppColors.textDark : AppColors.cardWhite,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppTheme.subtleShadow,
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '${date.day}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: isToday ? Colors.white : AppColors.textDark,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isToday ? Colors.white70 : AppColors.textGray,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  musculos,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isToday ? Colors.white : AppColors.textDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${porcentagem.toStringAsFixed(0)}%',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: isToday ? Colors.white : AppColors.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDayCardSkeleton(bool isToday) {
+    return Container(
+      height: 140,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isToday ? AppColors.textDark : AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.subtleShadow,
+      ),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: isToday ? Colors.white : AppColors.primaryGreen,
+          strokeWidth: 2,
         ),
       ),
     );
   }
+
+  Widget _buildMetrics(AppStrings strings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          strings.metrics,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        FutureBuilder<Map<String, double>>(
+          key: ValueKey('${_rebuildKey}_metrics'),
+          future: _getProgressData(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final progress = snapshot.data ??
+                {'calorias': 0.0, 'pesoLevantado': 0.0, 'tempoCardio': 0.0};
+
+            return Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    Icons.local_fire_department,
+                    progress['calorias']!.toStringAsFixed(0),
+                    strings.kcal,
+                    strings.burned,
+                    AppColors.accentOrange,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    Icons.fitness_center,
+                    progress['pesoLevantado']!.toStringAsFixed(0),
+                    strings.kg,
+                    strings.lifted,
+                    AppColors.primaryPurple,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    Icons.timer,
+                    progress['tempoCardio']!.toStringAsFixed(0),
+                    strings.minutes,
+                    strings.trained,
+                    AppColors.primaryGreen,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(
+    IconData icon,
+    String value,
+    String unit,
+    String label,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.subtleShadow,
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          Text(
+            unit,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===== CIRCULAR PROGRESS PAINTER =====
+class CircularProgressPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  CircularProgressPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final bgPaint = Paint()
+      ..color = AppColors.textLight.withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius - 4, bgPaint);
+
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - 4),
+      -math.pi / 2,
+      2 * math.pi * progress,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
