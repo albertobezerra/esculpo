@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -304,7 +305,81 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
 
                   // MÉTRICAS/PROGRESSO
                   _buildMetrics(strings),
-                  const SizedBox(height: 100),
+
+                  const SizedBox(height: 20),
+
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => TelaFotosProgresso()),
+                      );
+                    },
+                    child: Container(
+                      margin: EdgeInsets.only(top: 16),
+                      padding: EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primaryPurple,
+                            AppColors.accentPink
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                AppColors.primaryPurple.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.photo_camera,
+                                color: Colors.white, size: 32),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Fotos de Progresso',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Registre sua evolução',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios,
+                              color: Colors.white, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -765,6 +840,7 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
     );
   }
 
+  //METRICAS
   Widget _buildMetrics(AppStrings strings) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

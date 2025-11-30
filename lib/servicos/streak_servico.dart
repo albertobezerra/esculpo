@@ -168,7 +168,7 @@ class StreakServico {
       };
     } else {
       return {
-        'mensagem': 'LENDA! ${streakAtual} dias!',
+        'mensagem': 'LENDA! $streakAtual dias!',
         'icone': '🔥',
       };
     }

@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// ✅ CORRETO - está em servicos/, não models/
+import 'package:guarda_corpo_2024/servicos/foto_progresso_servico.dart';
 import 'package:guarda_corpo_2024/servicos/ad_service.dart';
 import 'package:guarda_corpo_2024/servicos/exercise_service.dart';
 import 'package:guarda_corpo_2024/servicos/gerador_treinos_servico.dart';
@@ -10,7 +12,6 @@ final exerciseProvider =
     Provider<ExerciseService>((ref) => ExerciseService(ref));
 final workoutProvider = Provider<WorkoutService>((ref) => WorkoutService(ref));
 
-// NOVO: Substituindo o planGeneratorServiceProvider antigo
 final geradorTreinosProvider = Provider<GeradorTreinosServico>(
   (ref) => GeradorTreinosServico(ref),
 );
@@ -20,3 +21,7 @@ final suggestionServiceProvider =
 final subscriptionProvider =
     Provider<SubscriptionService>((ref) => SubscriptionService());
 final adServiceProvider = Provider<AdService>((ref) => AdService());
+
+final fotoProgressoServicoProvider = Provider<FotoProgressoServico>((ref) {
+  return FotoProgressoServico();
+});
