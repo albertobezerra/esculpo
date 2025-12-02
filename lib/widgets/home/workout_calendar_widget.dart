@@ -78,7 +78,10 @@ class WorkoutCalendarWidget extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => TelaDetalheTreino(workout: data),
+                  builder: (_) => TelaDetalheTreino(
+                    workout: data,
+                    treinoDocId: data['treinoDocId'] as String,
+                  ),
                 ),
               );
             }

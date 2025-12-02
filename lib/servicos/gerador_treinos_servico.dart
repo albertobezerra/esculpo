@@ -1,5 +1,3 @@
-// lib/servicos/gerador_treinos_servico.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,7 +125,11 @@ class GeradorTreinosServico {
       if (treinoSnapshot.docs.isNotEmpty) {
         debugPrint('✅ Treino já existe para hoje');
         final workoutData = treinoSnapshot.docs.first.data();
-        return _formatarTreinoParaExibicao(workoutData);
+        final treinoDocId = treinoSnapshot.docs.first.id;
+        return _formatarTreinoParaExibicao({
+          ...workoutData,
+          'treinoDocId': treinoDocId,
+        });
       }
 
       // Buscar plano de treino
@@ -172,16 +174,21 @@ class GeradorTreinosServico {
         'caloriasEstimadas': treinoDoDia['caloriasEstimadas'] ?? 0.0,
       };
 
+      final treinoDocId = normalizedDate.toIso8601String();
+
       await _firestore
           .collection('usuarios')
           .doc(usuarioId)
           .collection('treinos')
-          .doc(normalizedDate.toIso8601String())
+          .doc(treinoDocId)
           .set(treinoParaSalvar);
 
       debugPrint('✅ Treino do dia salvo com sucesso!');
 
-      return _formatarTreinoParaExibicao(treinoParaSalvar);
+      return _formatarTreinoParaExibicao({
+        ...treinoParaSalvar,
+        'treinoDocId': treinoDocId,
+      });
     } catch (e) {
       debugPrint('❌ Erro ao gerar treino diário: $e');
       return {
@@ -192,6 +199,7 @@ class GeradorTreinosServico {
         'createdAt': null,
         'tempoEstimado': 0,
         'caloriasEstimadas': 0.0,
+        'treinoDocId': null,
       };
     }
   }
@@ -206,6 +214,7 @@ class GeradorTreinosServico {
       'createdAt': treinoData['dataCriacao'],
       'tempoEstimado': treinoData['tempoEstimado']?.toInt() ?? 0,
       'caloriasEstimadas': treinoData['caloriasEstimadas']?.toDouble() ?? 0.0,
+      'treinoDocId': treinoData['treinoDocId'],
     };
   }
 
@@ -298,14 +307,12 @@ class GeradorTreinosServico {
     required String objetivo,
     required NivelExercicio nivel,
   }) {
-    // Filtrar exercícios por grupo muscular
     final candidatos = todosExercicios.where((ex) {
       return grupos.contains(ex.grupoPrincipal);
     }).toList();
 
     debugPrint('   🔍 Candidatos encontrados: ${candidatos.length}');
 
-    // Se não houver exercícios suficientes, relaxar filtro
     if (candidatos.length < 3) {
       candidatos.addAll(todosExercicios.where((ex) {
         return !candidatos.contains(ex);
@@ -315,7 +322,6 @@ class GeradorTreinosServico {
     candidatos.shuffle();
     final selecionados = candidatos.take(5).toList();
 
-    // Definir séries/reps baseado no objetivo
     int series = 3;
     int repeticoes = 12;
     int descanso = 60;

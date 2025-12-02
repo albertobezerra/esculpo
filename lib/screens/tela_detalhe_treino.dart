@@ -6,11 +6,17 @@ import 'package:intl/intl.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
 import 'tela_treino_ativo.dart';
+import 'tela_editar_exercicio.dart';
 
 class TelaDetalheTreino extends StatelessWidget {
   final Map<String, dynamic> workout;
+  final String treinoDocId; // id do doc em /treinos
 
-  const TelaDetalheTreino({super.key, required this.workout});
+  const TelaDetalheTreino({
+    super.key,
+    required this.workout,
+    required this.treinoDocId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +163,11 @@ class TelaDetalheTreino extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final ex =
                                   exercicios[index] as Map<String, dynamic>;
-                              return _buildExercicioCard(context, ex, index);
+                              return _buildExercicioCard(
+                                context,
+                                ex,
+                                index,
+                              );
                             },
                           ),
 
@@ -285,6 +295,7 @@ class TelaDetalheTreino extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // bolinha com número / check
           Container(
             width: 48,
             height: 48,
@@ -307,6 +318,8 @@ class TelaDetalheTreino extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
+
+          // texto do exercício
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,12 +337,33 @@ class TelaDetalheTreino extends StatelessWidget {
                     _buildDetail(Icons.repeat, '$repeticoes reps'),
                     if (carga > 0)
                       _buildDetail(
-                          Icons.line_weight, '${carga.toStringAsFixed(1)} kg'),
+                        Icons.line_weight,
+                        '${carga.toStringAsFixed(1)} kg',
+                      ),
                     _buildDetail(Icons.timer, '${descanso}s'),
                   ],
                 ),
               ],
             ),
+          ),
+
+          // botão lápis
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20, color: AppColors.textGray),
+            onPressed: treinoDocId.isEmpty
+                ? null // desativa quando veio do plano, não do treino diário
+                : () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TelaEditarExercicio(
+                          exercicio: ex,
+                          treinoDocId: treinoDocId,
+                          exercicioIndex: index,
+                        ),
+                      ),
+                    );
+                  },
           ),
         ],
       ),
@@ -344,7 +378,7 @@ class TelaDetalheTreino extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           text,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
             color: AppColors.textGray,
           ),

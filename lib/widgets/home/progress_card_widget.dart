@@ -43,7 +43,10 @@ class ProgressCardWidget extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TelaDetalheTreino(workout: workout!),
+                      builder: (_) => TelaDetalheTreino(
+                        workout: workout!,
+                        treinoDocId: workout['treinoDocId'] as String,
+                      ),
                     ),
                   );
                 }
@@ -127,8 +130,10 @@ class ProgressCardWidget extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                TelaDetalheTreino(workout: workout!),
+                            builder: (_) => TelaDetalheTreino(
+                              workout: workout!,
+                              treinoDocId: workout['treinoDocId'] as String,
+                            ),
                           ),
                         );
                       },
