@@ -1,3 +1,6 @@
+// lib/main.dart
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
+import 'package:guarda_corpo_2024/servicos/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/tela_inicial.dart';
 import 'screens/tela_onboarding.dart';
@@ -12,11 +16,26 @@ import 'screens/tela_login.dart';
 import 'screens/tela_splash.dart';
 import 'firebase_options.dart';
 
+// ✅ HANDLER DE BACKGROUND (fora da classe)
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('📬 Background message: ${message.notification?.title}');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Registra o handler de background do Firebase
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Inicializa NotificationService
+  await NotificationService().initialize();
+
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -38,12 +57,12 @@ class MyApp extends StatelessWidget {
       ],
       locale: const Locale('pt', 'BR'),
       title: 'Esculpo',
-      theme: AppTheme.lightTheme, // CORRIGIDO
+      theme: AppTheme.lightTheme,
       home: const TelaSplash(),
       routes: {
         '/tela_login': (context) => const TelaLogin(),
         '/tela_onboarding': (context) => const TelaOnboarding(),
-        '/tela_inicial': (context) => const TelaInicial(),
+        '/tela_inicial': (context) => const TelaInicial(), // ← Remove a key
       },
     );
   }

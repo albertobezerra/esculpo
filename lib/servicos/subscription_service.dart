@@ -22,7 +22,7 @@ class SubscriptionService {
 
   Stream<bool> isPremium(String userId) {
     return _firestore
-        .collection('users')
+        .collection('usuarios') // ← MUDOU AQUI
         .doc(userId)
         .snapshots()
         .map((doc) => doc.data()?['premium'] ?? false);
@@ -43,7 +43,7 @@ class SubscriptionService {
   Future<void> _completePurchase(PurchaseDetails purchase) async {
     if (purchase.status == PurchaseStatus.purchased) {
       await _firestore
-          .collection('users')
+          .collection('usuarios') // ← MUDOU AQUI TAMBÉM
           .doc(FirebaseAuth.instance.currentUser!.uid)
           .update({
         'subscription': purchase.productID,

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
 import 'package:confetti/confetti.dart';
+import 'package:guarda_corpo_2024/servicos/notification_service.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -187,6 +188,13 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
   void _mostrarDialogParabens() {
     setState(() => _mostrarParabens = true);
     _confettiController.play();
+
+    // ⬇️ ADICIONA ESTAS 4 LINHAS AQUI
+    NotificationService().showNotification(
+      title: '🎉 Treino Concluído!',
+      body:
+          'Queimaste ${_calorias.toStringAsFixed(0)} kcal! Excelente trabalho! 💪',
+    );
 
     showDialog(
       context: context,

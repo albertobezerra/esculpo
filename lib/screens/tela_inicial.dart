@@ -1,44 +1,43 @@
 // lib/screens/tela_inicial.dart
 
 import 'package:flutter/material.dart';
-import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
-import 'tela_planos_treino.dart';
-import 'tela_historico_treinos.dart';
-import 'tela_exercicios.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
+import 'package:guarda_corpo_2024/providers/navigation_provider.dart';
+import 'package:guarda_corpo_2024/screens/profile_screen.dart';
+import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
 import 'package:guarda_corpo_2024/widgets/home/tela_inicial_content.dart';
+import 'tela_exercicios.dart';
+import 'tela_historico_treinos.dart';
+import 'tela_planos_treino.dart';
 
-class TelaInicial extends StatefulWidget {
+class TelaInicial extends ConsumerWidget {
   const TelaInicial({super.key});
 
   @override
-  State<TelaInicial> createState() => _TelaInicialState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedIndex = ref.watch(selectedIndexProvider);
 
-class _TelaInicialState extends State<TelaInicial> {
-  int _selectedIndex = 0;
+    final pages = <Widget>[
+      const TelaInicialContent(),
+      const TelaPlanosTreino(),
+      const TelaHistoricoTreinos(),
+      const TelaExercicios(),
+      const TelaFotosProgresso(),
+      const ProfileScreen(),
+    ];
 
-  final List<Widget> _pages = [
-    const TelaInicialContent(),
-    const TelaPlanosTreino(),
-    const TelaHistoricoTreinos(),
-    const TelaExercicios(),
-    const TelaFotosProgresso(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
+        index: selectedIndex,
+        children: pages,
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _buildBottomNav(ref, selectedIndex),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(WidgetRef ref, int selectedIndex) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardWhite,
@@ -56,13 +55,18 @@ class _TelaInicialState extends State<TelaInicial> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavIcon(Icons.home_outlined, Icons.home, 0),
               _buildNavIcon(
-                  Icons.calendar_today_outlined, Icons.calendar_today, 1),
-              _buildNavIcon(Icons.history_outlined, Icons.history, 2),
+                  ref, Icons.home_outlined, Icons.home, 0, selectedIndex),
+              _buildNavIcon(ref, Icons.calendar_today_outlined,
+                  Icons.calendar_today, 1, selectedIndex),
               _buildNavIcon(
-                  Icons.fitness_center_outlined, Icons.fitness_center, 3),
-              _buildNavIcon(Icons.photo_camera_outlined, Icons.photo_camera, 4),
+                  ref, Icons.history_outlined, Icons.history, 2, selectedIndex),
+              _buildNavIcon(ref, Icons.fitness_center_outlined,
+                  Icons.fitness_center, 3, selectedIndex),
+              _buildNavIcon(ref, Icons.photo_camera_outlined,
+                  Icons.photo_camera, 4, selectedIndex),
+              _buildNavIcon(
+                  ref, Icons.person_outline, Icons.person, 5, selectedIndex),
             ],
           ),
         ),
@@ -70,10 +74,19 @@ class _TelaInicialState extends State<TelaInicial> {
     );
   }
 
-  Widget _buildNavIcon(IconData outlinedIcon, IconData filledIcon, int index) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildNavIcon(
+    WidgetRef ref,
+    IconData outlinedIcon,
+    IconData filledIcon,
+    int index,
+    int currentIndex,
+  ) {
+    final isSelected = currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () {
+        ref.read(selectedIndexProvider.notifier).state = index;
+        debugPrint('📍 Navegou para índice: $index');
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),

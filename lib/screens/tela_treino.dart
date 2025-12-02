@@ -117,7 +117,8 @@ class _TelaTreinoState extends ConsumerState<TelaTreino> {
         .map((e) =>
             '${e['nome']}: ${e['series']} séries, ${e['repeticoes']} reps, ${e['cargaSugerida']}kg')
         .join('\n');
-    await Share.share('Meu treino:\n$workoutText');
+    await SharePlus.instance
+        .share(ShareParams(text: 'Meu treino:\n$workoutText'));
   }
 
   @override
