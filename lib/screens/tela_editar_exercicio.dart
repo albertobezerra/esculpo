@@ -7,7 +7,7 @@ import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 
 class TelaEditarExercicio extends StatefulWidget {
   final Map<String, dynamic> exercicio;
-  final String treinoDocId; // id do documento em 'treinos' (data normalizada)
+  final String treinoDocId; // id do documento em 'treinos'
   final int exercicioIndex;
 
   const TelaEditarExercicio({
@@ -80,6 +80,7 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
         throw Exception('Índice de exercício inválido');
       }
 
+      // Atualiza o exercício específico
       exercicios[widget.exercicioIndex] = {
         ...exercicios[widget.exercicioIndex],
         'series': int.parse(_seriesController.text),
@@ -90,13 +91,20 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
         'editadoEm': Timestamp.now(),
       };
 
-      await treinoRef.update({'exercicios': exercicios});
+      // Recalcula totais do treino com base na nova lista
+      final novosTotais = _recalcularTotais(exercicios);
+
+      await treinoRef.update({
+        'exercicios': exercicios,
+        'tempoEstimado': novosTotais['tempo'],
+        'caloriasEstimadas': novosTotais['calorias'],
+      });
 
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Exercício atualizado com sucesso!'),
+            content: Text('✅ Treino atualizado e recalculado!'),
             backgroundColor: AppColors.primaryGreen,
           ),
         );
@@ -113,6 +121,26 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Map<String, dynamic> _recalcularTotais(List<Map<String, dynamic>> lista) {
+    double totalMinutos = 0;
+    double totalCalorias = 0;
+
+    for (var ex in lista) {
+      final series = (ex['series'] as num?)?.toInt() ?? 3;
+      // Tenta pegar duração/calorias salvas no exercício, ou usa defaults
+      final duracaoPorSerie = (ex['duracao'] as num?)?.toDouble() ?? 2.0;
+      final caloriasPorSerie = (ex['calorias'] as num?)?.toDouble() ?? 50.0;
+
+      totalMinutos += series * duracaoPorSerie;
+      totalCalorias += series * caloriasPorSerie;
+    }
+
+    return {
+      'tempo': totalMinutos.round(),
+      'calorias': totalCalorias,
+    };
   }
 
   @override

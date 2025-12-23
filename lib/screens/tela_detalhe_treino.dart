@@ -1,6 +1,7 @@
 // lib/screens/tela_detalhe_treino.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
@@ -20,14 +21,52 @@ class TelaDetalheTreino extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Se temos um ID de treino válido (não é visualização de plano),
+    // ouvimos o Firestore em tempo real.
+    if (treinoDocId.isNotEmpty) {
+      final userId = FirebaseAuth.instance.currentUser!.uid;
+      return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(userId)
+            .collection('treinos')
+            .doc(treinoDocId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          // Enquanto carrega ou se der erro, mostra o workout estático que foi passado
+          // Isso evita "piscadas" de loading na transição
+          Map<String, dynamic> currentWorkout = workout;
+
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            // Mescla os dados do Firestore com o ID (para manter consistência)
+            currentWorkout = {
+              ...data,
+              'treinoDocId': treinoDocId,
+            };
+          }
+
+          return _buildContent(context, currentWorkout);
+        },
+      );
+    }
+
+    // Se for visualização de plano (sem ID), mostra estático
+    return _buildContent(context, workout);
+  }
+
+  Widget _buildContent(BuildContext context, Map<String, dynamic> data) {
     final strings = AppStrings.of(context);
-    final musculos = workout['musculos'] as String? ?? 'Treino';
-    final exercicios = (workout['treinos'] as List<dynamic>?) ?? [];
-    final tempoEstimado = workout['tempoEstimado'] as int? ?? 0;
+    final musculos = data['musculos'] as String? ?? 'Treino';
+    final exercicios = (data['exercicios'] as List<dynamic>?) ??
+        (data['treinos'] as List<dynamic>?) ??
+        []; // Aceita 'exercicios' (firestore) ou 'treinos' (legacy/plano)
+    final tempoEstimado = data['tempoEstimado'] as int? ?? 0;
     final caloriasEstimadas =
-        (workout['caloriasEstimadas'] as num?)?.toDouble() ?? 0.0;
-    final createdAt = workout['createdAt'] as Timestamp?;
-    final porcentagem = (workout['porcentagem'] as num?)?.toDouble() ?? 0.0;
+        (data['caloriasEstimadas'] as num?)?.toDouble() ?? 0.0;
+    final createdAt = data['createdAt'] as Timestamp? ??
+        data['dataCriacao'] as Timestamp?; // Aceita ambos
+    final porcentagem = (data['porcentagem'] as num?)?.toDouble() ?? 0.0;
 
     String formattedDate = '';
     if (createdAt != null) {
@@ -198,7 +237,7 @@ class TelaDetalheTreino extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => TelaTreinoAtivo(workout: workout),
+                          builder: (_) => TelaTreinoAtivo(workout: data),
                         ),
                       );
                     },
@@ -363,6 +402,7 @@ class TelaDetalheTreino extends StatelessWidget {
                         ),
                       ),
                     );
+                    // Não precisamos mais dar reload manual, o Stream faz isso!
                   },
           ),
         ],
