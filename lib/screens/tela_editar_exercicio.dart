@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 
 class TelaEditarExercicio extends StatefulWidget {
@@ -29,6 +30,10 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
   late TextEditingController _descansoController;
   bool _isLoading = false;
 
+  // Variáveis para o histórico
+  double? _ultimaCarga;
+  DateTime? _ultimaData;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +49,61 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
     _descansoController = TextEditingController(
       text: (widget.exercicio['descansoSegundos'] ?? 60).toString(),
     );
+
+    _buscarHistorico();
+  }
+
+  Future<void> _buscarHistorico() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser!.uid;
+      final nomeExercicio = widget.exercicio['nome'];
+
+      // Busca os últimos 20 treinos ordenados por data
+      final snapshot = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('treinos')
+          .orderBy('dataCriacao', descending: true)
+          .limit(20)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        // Pula o treino atual que estamos editando
+        if (doc.id == widget.treinoDocId) continue;
+
+        final dados = doc.data();
+        final listaExercicios = dados['exercicios'] as List<dynamic>? ?? [];
+
+        // Procura o exercício pelo nome na lista deste treino
+        // (idealmente usaríamos ID, mas nome funciona bem para começar)
+        final exercicioEncontrado = listaExercicios.firstWhere(
+          (e) => e['nome'] == nomeExercicio,
+          orElse: () => null,
+        );
+
+        if (exercicioEncontrado != null) {
+          final carga =
+              (exercicioEncontrado['cargaSugerida'] as num?)?.toDouble();
+
+          // Só considera se tiver alguma carga registrada (> 0)
+          if (carga != null && carga > 0) {
+            if (mounted) {
+              setState(() {
+                _ultimaCarga = carga;
+                _ultimaData = (dados['dataCriacao'] as Timestamp?)?.toDate();
+              });
+            }
+            return; // Encontrou o mais recente, para a busca
+          }
+        }
+      }
+
+      // Se varreu tudo e não achou
+      if (mounted) {}
+    } catch (e) {
+      debugPrint('Erro ao buscar histórico: $e');
+      if (mounted) {}
+    }
   }
 
   @override
@@ -129,7 +189,6 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
 
     for (var ex in lista) {
       final series = (ex['series'] as num?)?.toInt() ?? 3;
-      // Tenta pegar duração/calorias salvas no exercício, ou usa defaults
       final duracaoPorSerie = (ex['duracao'] as num?)?.toDouble() ?? 2.0;
       final caloriasPorSerie = (ex['calorias'] as num?)?.toDouble() ?? 50.0;
 
@@ -175,6 +234,7 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            // Card do Título
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -205,6 +265,61 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
                 ],
               ),
             ),
+
+            // Card de Histórico (NOVO)
+            if (_ultimaCarga != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history, color: Colors.blue, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Última vez: ${_ultimaCarga!.toStringAsFixed(1)} kg',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          if (_ultimaData != null)
+                            Text(
+                              DateFormat('dd/MM/yyyy').format(_ultimaData!),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.withValues(alpha: 0.8),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _cargaController.text = _ultimaCarga.toString();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Carga atualizada!'),
+                            duration: Duration(milliseconds: 500),
+                          ),
+                        );
+                      },
+                      child: const Text('USAR'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 24),
             Text(
               'Ajustar parâmetros',
