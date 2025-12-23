@@ -44,6 +44,7 @@ dependencies:
   syncfusion_flutter_gauges: ^31.2.15
   flutter_localizations:
     sdk: flutter
+  circular_countdown_timer: ^0.2.4
 
 dev_dependencies:
   flutter_test:

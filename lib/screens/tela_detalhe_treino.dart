@@ -3,9 +3,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Para HapticFeedback
 import 'package:intl/intl.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
+// Import do nosso Timer (ajuste o caminho se necessário)
+import '../widgets/timer/timer_descanso_modal.dart';
 import 'tela_treino_ativo.dart';
 import 'tela_editar_exercicio.dart';
 
@@ -18,6 +21,70 @@ class TelaDetalheTreino extends StatelessWidget {
     required this.workout,
     required this.treinoDocId,
   });
+
+  // --- LÓGICA NOVA: Marcar como feito e Abrir Timer ---
+  Future<void> _toggleConcluido(BuildContext context, int index,
+      Map<String, dynamic> exercicioAtual) async {
+    if (treinoDocId.isEmpty)
+      return; // Não faz nada se for só visualização do plano
+
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+    final docRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId)
+        .collection('treinos')
+        .doc(treinoDocId);
+
+    try {
+      // 1. Busca o treino atual para garantir que temos a lista sincronizada
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) return;
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      List<dynamic> exercicios =
+          List.from((data['exercicios'] as List<dynamic>?) ?? []);
+
+      // 2. Modifica o status do exercício clicado
+      bool novoStatus = !(exercicioAtual['concluido'] as bool? ?? false);
+
+      // Atualiza o mapa do exercício dentro da lista
+      Map<String, dynamic> exercicioEditado = Map.from(exercicios[index]);
+      exercicioEditado['concluido'] = novoStatus;
+      exercicios[index] = exercicioEditado;
+
+      // 3. Salva no Firestore
+      await docRef.update({'exercicios': exercicios});
+
+      // 4. SE marcou como concluído -> ABRE O TIMER!
+      if (novoStatus && context.mounted) {
+        // Vibra para dar feedback tátil
+        HapticFeedback.mediumImpact();
+
+        final tempoDescanso =
+            exercicioEditado['descansoSegundos'] as int? ?? 60;
+
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => TimerDescansoModal(
+            tempoInicialSegundos: tempoDescanso,
+            onTimerFinalizado: () {
+              // Opcional: Tocar som aqui futuramente
+              print("Descanso finalizado!");
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      print("Erro ao atualizar exercício: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Erro ao atualizar: $e'),
+            backgroundColor: AppColors.error),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +100,10 @@ class TelaDetalheTreino extends StatelessWidget {
             .doc(treinoDocId)
             .snapshots(),
         builder: (context, snapshot) {
-          // Enquanto carrega ou se der erro, mostra o workout estático que foi passado
-          // Isso evita "piscadas" de loading na transição
           Map<String, dynamic> currentWorkout = workout;
 
           if (snapshot.hasData && snapshot.data!.exists) {
             final data = snapshot.data!.data() as Map<String, dynamic>;
-            // Mescla os dados do Firestore com o ID (para manter consistência)
             currentWorkout = {
               ...data,
               'treinoDocId': treinoDocId,
@@ -51,7 +115,6 @@ class TelaDetalheTreino extends StatelessWidget {
       );
     }
 
-    // Se for visualização de plano (sem ID), mostra estático
     return _buildContent(context, workout);
   }
 
@@ -60,12 +123,12 @@ class TelaDetalheTreino extends StatelessWidget {
     final musculos = data['musculos'] as String? ?? 'Treino';
     final exercicios = (data['exercicios'] as List<dynamic>?) ??
         (data['treinos'] as List<dynamic>?) ??
-        []; // Aceita 'exercicios' (firestore) ou 'treinos' (legacy/plano)
+        [];
     final tempoEstimado = data['tempoEstimado'] as int? ?? 0;
     final caloriasEstimadas =
         (data['caloriasEstimadas'] as num?)?.toDouble() ?? 0.0;
-    final createdAt = data['createdAt'] as Timestamp? ??
-        data['dataCriacao'] as Timestamp?; // Aceita ambos
+    final createdAt =
+        data['createdAt'] as Timestamp? ?? data['dataCriacao'] as Timestamp?;
     final porcentagem = (data['porcentagem'] as num?)?.toDouble() ?? 0.0;
 
     String formattedDate = '';
@@ -123,9 +186,7 @@ class TelaDetalheTreino extends StatelessWidget {
                             style: Theme.of(context)
                                 .textTheme
                                 .titleLarge
-                                ?.copyWith(
-                                  color: AppColors.textGray,
-                                ),
+                                ?.copyWith(color: AppColors.textGray),
                           ),
                         ],
                       ),
@@ -265,13 +326,8 @@ class TelaDetalheTreino extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(
-    BuildContext context,
-    IconData icon,
-    String value,
-    String label,
-    Color color,
-  ) {
+  Widget _buildInfoCard(BuildContext context, IconData icon, String value,
+      String label, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -334,28 +390,34 @@ class TelaDetalheTreino extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // bolinha com número / check
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: concluido
-                  ? AppColors.primaryGreen
-                  : AppColors.primaryPurple.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: concluido
-                  ? const Icon(Icons.check, color: Colors.white, size: 24)
-                  : Text(
-                      '${index + 1}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: AppColors.primaryPurple,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
+          // --- ÁREA DE CLIQUE: BOLINHA ---
+          InkWell(
+            onTap: () => _toggleConcluido(context, index, ex),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: concluido
+                    ? AppColors.primaryGreen
+                    : AppColors.primaryPurple.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: concluido
+                    ? const Icon(Icons.check, color: Colors.white, size: 24)
+                    : Text(
+                        '${index + 1}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: AppColors.primaryPurple,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+              ),
             ),
           ),
+          // ------------------------------
+
           const SizedBox(width: 16),
 
           // texto do exercício
@@ -390,7 +452,7 @@ class TelaDetalheTreino extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit, size: 20, color: AppColors.textGray),
             onPressed: treinoDocId.isEmpty
-                ? null // desativa quando veio do plano, não do treino diário
+                ? null
                 : () async {
                     await Navigator.push(
                       context,
@@ -402,7 +464,6 @@ class TelaDetalheTreino extends StatelessWidget {
                         ),
                       ),
                     );
-                    // Não precisamos mais dar reload manual, o Stream faz isso!
                   },
           ),
         ],

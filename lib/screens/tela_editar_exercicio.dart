@@ -28,7 +28,9 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
   late TextEditingController _repsController;
   late TextEditingController _cargaController;
   late TextEditingController _descansoController;
+
   bool _isLoading = false;
+  bool _salvarNoPlano = false; // Novo Checkbox
 
   // Variáveis para o histórico
   double? _ultimaCarga;
@@ -68,14 +70,11 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
           .get();
 
       for (var doc in snapshot.docs) {
-        // Pula o treino atual que estamos editando
         if (doc.id == widget.treinoDocId) continue;
 
         final dados = doc.data();
         final listaExercicios = dados['exercicios'] as List<dynamic>? ?? [];
 
-        // Procura o exercício pelo nome na lista deste treino
-        // (idealmente usaríamos ID, mas nome funciona bem para começar)
         final exercicioEncontrado = listaExercicios.firstWhere(
           (e) => e['nome'] == nomeExercicio,
           orElse: () => null,
@@ -85,7 +84,6 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
           final carga =
               (exercicioEncontrado['cargaSugerida'] as num?)?.toDouble();
 
-          // Só considera se tiver alguma carga registrada (> 0)
           if (carga != null && carga > 0) {
             if (mounted) {
               setState(() {
@@ -93,16 +91,12 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
                 _ultimaData = (dados['dataCriacao'] as Timestamp?)?.toDate();
               });
             }
-            return; // Encontrou o mais recente, para a busca
+            return;
           }
         }
       }
-
-      // Se varreu tudo e não achou
-      if (mounted) {}
     } catch (e) {
       debugPrint('Erro ao buscar histórico: $e');
-      if (mounted) {}
     }
   }
 
@@ -122,7 +116,10 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
 
     try {
       final userId = FirebaseAuth.instance.currentUser!.uid;
-      final treinoRef = FirebaseFirestore.instance
+      final firestore = FirebaseFirestore.instance;
+
+      // 1. Atualiza o Treino do Dia
+      final treinoRef = firestore
           .collection('usuarios')
           .doc(userId)
           .collection('treinos')
@@ -134,42 +131,99 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
       final data = doc.data()!;
       final exercicios =
           List<Map<String, dynamic>>.from(data['exercicios'] ?? []);
+      final nomeTreino = data['musculos'] as String?; // Nome do treino
 
       if (widget.exercicioIndex < 0 ||
           widget.exercicioIndex >= exercicios.length) {
         throw Exception('Índice de exercício inválido');
       }
 
-      // Atualiza o exercício específico
-      exercicios[widget.exercicioIndex] = {
-        ...exercicios[widget.exercicioIndex],
+      // Prepara os novos dados
+      final novosDadosExercicios = {
         'series': int.parse(_seriesController.text),
         'repeticoes': int.parse(_repsController.text),
         'cargaSugerida': double.parse(_cargaController.text),
         'descansoSegundos': int.parse(_descansoController.text),
+      };
+
+      // Atualiza na lista local
+      exercicios[widget.exercicioIndex] = {
+        ...exercicios[widget.exercicioIndex],
+        ...novosDadosExercicios,
         'editado': true,
         'editadoEm': Timestamp.now(),
       };
 
-      // Recalcula totais do treino com base na nova lista
       final novosTotais = _recalcularTotais(exercicios);
 
-      await treinoRef.update({
+      // Batch para garantir atomicidade
+      final batch = firestore.batch();
+
+      batch.update(treinoRef, {
         'exercicios': exercicios,
         'tempoEstimado': novosTotais['tempo'],
         'caloriasEstimadas': novosTotais['calorias'],
       });
 
+      // 2. Se marcado, atualiza também o Plano Base
+      if (_salvarNoPlano && nomeTreino != null) {
+        final planoRef = firestore
+            .collection('usuarios')
+            .doc(userId)
+            .collection('planos_treino')
+            .doc('personalized');
+
+        final planoDoc = await planoRef.get();
+        if (planoDoc.exists) {
+          final planoData = planoDoc.data()!;
+          final listaTreinosPlano =
+              List<Map<String, dynamic>>.from(planoData['treinos'] ?? []);
+
+          // Encontra o treino certo no plano
+          final indexTreinoPlano = listaTreinosPlano.indexWhere((t) =>
+              (t['titulo'] == nomeTreino || t['musculos'] == nomeTreino));
+
+          if (indexTreinoPlano != -1) {
+            final treinoPlano = listaTreinosPlano[indexTreinoPlano];
+            final listaExsPlano = List<Map<String, dynamic>>.from(
+                treinoPlano['exercicios'] ?? []);
+            final nomeEx = widget.exercicio['nome'];
+
+            // Encontra o exercício certo dentro desse treino
+            final indexExPlano =
+                listaExsPlano.indexWhere((e) => e['nome'] == nomeEx);
+
+            if (indexExPlano != -1) {
+              // Atualiza o exercício no plano
+              listaExsPlano[indexExPlano] = {
+                ...listaExsPlano[indexExPlano],
+                ...novosDadosExercicios,
+              };
+
+              treinoPlano['exercicios'] = listaExsPlano;
+              listaTreinosPlano[indexTreinoPlano] = treinoPlano;
+
+              batch.update(planoRef, {'treinos': listaTreinosPlano});
+            }
+          }
+        }
+      }
+
+      await batch.commit();
+
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Treino atualizado e recalculado!'),
+          SnackBar(
+            content: Text(_salvarNoPlano
+                ? '✅ Treino e Plano Padrão atualizados!'
+                : '✅ Treino atualizado!'),
             backgroundColor: AppColors.primaryGreen,
           ),
         );
       }
     } catch (e) {
+      debugPrint('Erro: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -266,7 +320,7 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
               ),
             ),
 
-            // Card de Histórico (NOVO)
+            // Card de Histórico
             if (_ultimaCarga != null) ...[
               const SizedBox(height: 16),
               Container(
@@ -354,6 +408,19 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
               icon: Icons.timer,
               suffix: 'seg',
             ),
+
+            // Checkbox para salvar no plano
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Salvar como padrão'),
+              subtitle: const Text('Aplica a futuros treinos deste tipo'),
+              value: _salvarNoPlano,
+              activeColor: AppColors.primaryPurple,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (val) => setState(() => _salvarNoPlano = val ?? false),
+            ),
+
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
