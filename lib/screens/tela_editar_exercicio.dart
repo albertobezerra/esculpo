@@ -30,53 +30,52 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
   late TextEditingController _descansoController;
 
   bool _isLoading = false;
-  bool _salvarNoPlano = false; // Novo Checkbox
+  bool _salvarNoPlano = false; // Checkbox mantido
 
   // Variáveis para o histórico
   double? _ultimaCarga;
   DateTime? _ultimaData;
+  bool _isLoadingHistory = true;
 
   @override
   void initState() {
     super.initState();
     _seriesController = TextEditingController(
-      text: (widget.exercicio['series'] ?? 3).toString(),
-    );
+        text: (widget.exercicio['series'] ?? 3).toString());
     _repsController = TextEditingController(
-      text: (widget.exercicio['repeticoes'] ?? 12).toString(),
-    );
+        text: (widget.exercicio['repeticoes'] ?? 12).toString());
     _cargaController = TextEditingController(
-      text: (widget.exercicio['cargaSugerida'] ?? 0).toString(),
-    );
+        text: (widget.exercicio['cargaSugerida'] ?? 0).toString());
     _descansoController = TextEditingController(
-      text: (widget.exercicio['descansoSegundos'] ?? 60).toString(),
-    );
+        text: (widget.exercicio['descansoSegundos'] ?? 60).toString());
 
     _buscarHistorico();
   }
 
+  // --- LÓGICA DE HISTÓRICO ATUALIZADA ---
   Future<void> _buscarHistorico() async {
     try {
       final userId = FirebaseAuth.instance.currentUser!.uid;
       final nomeExercicio = widget.exercicio['nome'];
 
-      // Busca os últimos 20 treinos ordenados por data
+      // Agora buscamos na coleção correta: 'historico_concluido'
+      // Onde os treinos finalizados foram salvos
       final snapshot = await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(userId)
-          .collection('treinos')
-          .orderBy('dataCriacao', descending: true)
+          .collection('historico_concluido')
+          .orderBy('finalizadoEm',
+              descending: true) // Ordena pela data de conclusão
           .limit(20)
           .get();
 
       for (var doc in snapshot.docs) {
-        if (doc.id == widget.treinoDocId) continue;
-
         final dados = doc.data();
         final listaExercicios = dados['exercicios'] as List<dynamic>? ?? [];
 
+        // Procura se esse exercício foi feito nesse treino
         final exercicioEncontrado = listaExercicios.firstWhere(
-          (e) => e['nome'] == nomeExercicio,
+          (e) => e['nome'] == nomeExercicio && (e['concluido'] == true),
           orElse: () => null,
         );
 
@@ -88,15 +87,19 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
             if (mounted) {
               setState(() {
                 _ultimaCarga = carga;
-                _ultimaData = (dados['dataCriacao'] as Timestamp?)?.toDate();
+                _ultimaData = (dados['finalizadoEm'] as Timestamp?)?.toDate();
+                _isLoadingHistory = false;
               });
             }
             return;
           }
         }
       }
+
+      if (mounted) setState(() => _isLoadingHistory = false); // Não achou nada
     } catch (e) {
       debugPrint('Erro ao buscar histórico: $e');
+      if (mounted) setState(() => _isLoadingHistory = false);
     }
   }
 
@@ -131,14 +134,13 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
       final data = doc.data()!;
       final exercicios =
           List<Map<String, dynamic>>.from(data['exercicios'] ?? []);
-      final nomeTreino = data['musculos'] as String?; // Nome do treino
+      final nomeTreino = data['musculos'] as String?;
 
       if (widget.exercicioIndex < 0 ||
           widget.exercicioIndex >= exercicios.length) {
         throw Exception('Índice de exercício inválido');
       }
 
-      // Prepara os novos dados
       final novosDadosExercicios = {
         'series': int.parse(_seriesController.text),
         'repeticoes': int.parse(_repsController.text),
@@ -146,7 +148,6 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
         'descansoSegundos': int.parse(_descansoController.text),
       };
 
-      // Atualiza na lista local
       exercicios[widget.exercicioIndex] = {
         ...exercicios[widget.exercicioIndex],
         ...novosDadosExercicios,
@@ -156,7 +157,6 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
 
       final novosTotais = _recalcularTotais(exercicios);
 
-      // Batch para garantir atomicidade
       final batch = firestore.batch();
 
       batch.update(treinoRef, {
@@ -179,7 +179,6 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
           final listaTreinosPlano =
               List<Map<String, dynamic>>.from(planoData['treinos'] ?? []);
 
-          // Encontra o treino certo no plano
           final indexTreinoPlano = listaTreinosPlano.indexWhere((t) =>
               (t['titulo'] == nomeTreino || t['musculos'] == nomeTreino));
 
@@ -189,12 +188,10 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
                 treinoPlano['exercicios'] ?? []);
             final nomeEx = widget.exercicio['nome'];
 
-            // Encontra o exercício certo dentro desse treino
             final indexExPlano =
                 listaExsPlano.indexWhere((e) => e['nome'] == nomeEx);
 
             if (indexExPlano != -1) {
-              // Atualiza o exercício no plano
               listaExsPlano[indexExPlano] = {
                 ...listaExsPlano[indexExPlano],
                 ...novosDadosExercicios,
@@ -227,9 +224,8 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Erro ao salvar: $e'),
-            backgroundColor: AppColors.error,
-          ),
+              content: Text('❌ Erro ao salvar: $e'),
+              backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -245,15 +241,11 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
       final series = (ex['series'] as num?)?.toInt() ?? 3;
       final duracaoPorSerie = (ex['duracao'] as num?)?.toDouble() ?? 2.0;
       final caloriasPorSerie = (ex['calorias'] as num?)?.toDouble() ?? 50.0;
-
       totalMinutos += series * duracaoPorSerie;
       totalCalorias += series * caloriasPorSerie;
     }
 
-    return {
-      'tempo': totalMinutos.round(),
-      'calorias': totalCalorias,
-    };
+    return {'tempo': totalMinutos.round(), 'calorias': totalCalorias};
   }
 
   @override
@@ -269,18 +261,15 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
         actions: [
           if (_isLoading)
             const Padding(
-              padding: EdgeInsets.all(16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
           else
             IconButton(
-              icon: const Icon(Icons.check, color: AppColors.primaryGreen),
-              onPressed: _salvarAlteracoes,
-            ),
+                icon: const Icon(Icons.check, color: AppColors.primaryGreen),
+                onPressed: _salvarAlteracoes),
         ],
       ),
       body: Form(
@@ -292,68 +281,59 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.cardWhite,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.cardShadow,
-              ),
+                  color: AppColors.cardWhite,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppTheme.cardShadow),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryPurple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.fitness_center,
-                      color: AppColors.primaryPurple,
-                    ),
-                  ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: AppColors.primaryPurple.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.fitness_center,
+                          color: AppColors.primaryPurple)),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Text(
-                      nome,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
+                      child: Text(nome,
+                          style: Theme.of(context).textTheme.titleLarge)),
                 ],
               ),
             ),
 
-            // Card de Histórico
-            if (_ultimaCarga != null) ...[
+            // Card de Histórico (VISUAL MELHORADO)
+            if (_isLoadingHistory)
+              const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: LinearProgressIndicator()))
+            else if (_ultimaCarga != null) ...[
               const SizedBox(height: 16),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                ),
+                    color: AppColors.primaryPurple.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppColors.primaryPurple.withValues(alpha: 0.3))),
                 child: Row(
                   children: [
-                    const Icon(Icons.history, color: Colors.blue, size: 20),
+                    const Icon(Icons.history,
+                        color: AppColors.primaryPurple, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Última vez: ${_ultimaCarga!.toStringAsFixed(1)} kg',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
+                              'Última vez: ${_ultimaCarga!.toStringAsFixed(1)} kg',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textDark)),
                           if (_ultimaData != null)
-                            Text(
-                              DateFormat('dd/MM/yyyy').format(_ultimaData!),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.withValues(alpha: 0.8),
-                              ),
-                            ),
+                            Text(DateFormat('dd/MM/yyyy').format(_ultimaData!),
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.textGray)),
                         ],
                       ),
                     ),
@@ -361,11 +341,9 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
                       onPressed: () {
                         _cargaController.text = _ultimaCarga.toString();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Carga atualizada!'),
-                            duration: Duration(milliseconds: 500),
-                          ),
-                        );
+                            const SnackBar(
+                                content: Text('Carga copiada!'),
+                                duration: Duration(milliseconds: 500)));
                       },
                       child: const Text('USAR'),
                     ),
@@ -375,41 +353,34 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
             ],
 
             const SizedBox(height: 24),
-            Text(
-              'Ajustar parâmetros',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('Ajustar parâmetros',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
             _buildNumberField(
-              controller: _seriesController,
-              label: 'Séries',
-              icon: Icons.repeat,
-              suffix: 'séries',
-            ),
+                controller: _seriesController,
+                label: 'Séries',
+                icon: Icons.repeat,
+                suffix: 'séries'),
             const SizedBox(height: 16),
             _buildNumberField(
-              controller: _repsController,
-              label: 'Repetições',
-              icon: Icons.numbers,
-              suffix: 'reps',
-            ),
+                controller: _repsController,
+                label: 'Repetições',
+                icon: Icons.numbers,
+                suffix: 'reps'),
             const SizedBox(height: 16),
             _buildNumberField(
-              controller: _cargaController,
-              label: 'Carga sugerida',
-              icon: Icons.monitor_weight,
-              suffix: 'kg',
-              decimal: true,
-            ),
+                controller: _cargaController,
+                label: 'Carga sugerida',
+                icon: Icons.monitor_weight,
+                suffix: 'kg',
+                decimal: true),
             const SizedBox(height: 16),
             _buildNumberField(
-              controller: _descansoController,
-              label: 'Descanso',
-              icon: Icons.timer,
-              suffix: 'seg',
-            ),
+                controller: _descansoController,
+                label: 'Descanso',
+                icon: Icons.timer,
+                suffix: 'seg'),
 
-            // Checkbox para salvar no plano
             const SizedBox(height: 16),
             CheckboxListTile(
               title: const Text('Salvar como padrão'),
@@ -427,29 +398,20 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _salvarAlteracoes,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16))),
                 child: _isLoading
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Salvar alterações',
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Salvar alterações',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                            fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -458,44 +420,37 @@ class _TelaEditarExercicioState extends State<TelaEditarExercicio> {
     );
   }
 
-  Widget _buildNumberField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required String suffix,
-    bool decimal = false,
-  }) {
+  Widget _buildNumberField(
+      {required TextEditingController controller,
+      required String label,
+      required IconData icon,
+      required String suffix,
+      bool decimal = false}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.subtleShadow,
-      ),
+          color: AppColors.cardWhite,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppTheme.subtleShadow),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryPurple.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: AppColors.primaryPurple, size: 20),
-          ),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: AppColors.primaryPurple.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: AppColors.primaryPurple, size: 20)),
           const SizedBox(width: 16),
           Expanded(
             child: TextFormField(
               controller: controller,
               keyboardType: TextInputType.numberWithOptions(decimal: decimal),
               decoration: InputDecoration(
-                labelText: label,
-                border: InputBorder.none,
-                suffixText: suffix,
-              ),
+                  labelText: label,
+                  border: InputBorder.none,
+                  suffixText: suffix),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Obrigatório';
-                }
+                if (value == null || value.isEmpty) return 'Obrigatório';
                 final n =
                     decimal ? double.tryParse(value) : int.tryParse(value);
                 if (n == null || n < 0) return 'Valor inválido';

@@ -589,9 +589,7 @@ class _TelaHistoricoTreinosState extends State<TelaHistoricoTreinos> {
   }
 
   Stream<QuerySnapshot> _getTreinosStream() {
-    if (user == null) {
-      return const Stream.empty();
-    }
+    if (user == null) return const Stream.empty();
 
     final now = DateTime.now();
     DateTime startDate;
@@ -613,9 +611,10 @@ class _TelaHistoricoTreinosState extends State<TelaHistoricoTreinos> {
     return _firestore
         .collection('usuarios')
         .doc(user!.uid)
-        .collection('treinos')
-        .where('dataCriacao', isGreaterThanOrEqualTo: startDate)
-        .orderBy('dataCriacao', descending: true)
+        .collection('historico_concluido') // <--- MUDANÇA AQUI
+        .where('finalizadoEm',
+            isGreaterThanOrEqualTo: startDate) // <--- MUDANÇA DE CAMPO
+        .orderBy('finalizadoEm', descending: true)
         .snapshots();
   }
 }

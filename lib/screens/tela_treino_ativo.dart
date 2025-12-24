@@ -5,15 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
-import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
 import 'package:confetti/confetti.dart';
 import 'package:guarda_corpo_2024/servicos/notification_service.dart';
 import 'package:vibration/vibration.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import '../widgets/timer/timer_descanso_modal.dart';
 
 class TelaTreinoAtivo extends StatefulWidget {
   final Map<String, dynamic> workout;
-
   const TelaTreinoAtivo({super.key, required this.workout});
 
   @override
@@ -27,25 +25,22 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
 
   Timer? _timer;
   int _segundos = 0;
-  bool _isRunning = false;
+  bool _isRunning = true;
+  bool _isFinalizing = false;
 
   List<Map<String, dynamic>> _exercicios = [];
-  double _calorias = 0;
-  int _heartRate = 0;
-
-  bool _mostrarParabens = false;
+  String _treinoDocId = '';
+  // Controle de Expansão dos cards (para focar no exercício atual)
+  int _expandedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 3));
-
-    debugPrint('🚀 Iniciando TelaTreinoAtivo');
-    debugPrint('📦 Workout recebido: ${widget.workout.keys}');
-
+    _treinoDocId = widget.workout['treinoDocId'] ?? '';
     _carregarExercicios();
-    _simularHeartRate();
+    _iniciarTimer();
   }
 
   @override
@@ -56,265 +51,261 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
   }
 
   void _carregarExercicios() {
-    // Tentar múltiplas chaves possíveis
-    List<dynamic>? exerciciosRaw;
+    List<dynamic> listaBruta =
+        widget.workout['exercicios'] ?? widget.workout['treinos'] ?? [];
 
-    // Tentar 'treinos' primeiro
-    if (widget.workout.containsKey('treinos')) {
-      exerciciosRaw = widget.workout['treinos'] as List<dynamic>?;
-      debugPrint(
-          '📍 Encontrado ${exerciciosRaw?.length ?? 0} items em "treinos"');
-    }
+    // Preparação dos dados: Garantir que cada exercício tenha estrutura para séries individuais
+    _exercicios = listaBruta.map((e) {
+      final map = Map<String, dynamic>.from(e);
 
-    // Se não encontrou ou está vazio, tentar 'exercicios'
-    if ((exerciciosRaw == null || exerciciosRaw.isEmpty) &&
-        widget.workout.containsKey('exercicios')) {
-      exerciciosRaw = widget.workout['exercicios'] as List<dynamic>?;
-      debugPrint(
-          '📍 Encontrado ${exerciciosRaw?.length ?? 0} items em "exercicios"');
-    }
-
-    if (exerciciosRaw == null || exerciciosRaw.isEmpty) {
-      debugPrint('❌ ERRO: Nenhum exercício encontrado!');
-      debugPrint('🔍 Estrutura completa do workout:');
-      widget.workout.forEach((key, value) {
-        debugPrint('   - $key: ${value.runtimeType}');
-      });
-
-      // Mostrar alerta ao usuário
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Nenhum exercício encontrado neste treino'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      });
-    }
-
-    setState(() {
-      _exercicios = (exerciciosRaw ?? [])
-          .map((e) {
-            if (e is Map<String, dynamic>) {
-              return e;
-            } else if (e is Map) {
-              return Map<String, dynamic>.from(e);
-            } else {
-              debugPrint('⚠️ Item inválido: $e (${e.runtimeType})');
-              return <String, dynamic>{};
-            }
-          })
-          .where((e) => e.isNotEmpty)
-          .toList();
-
-      debugPrint('✅ ${_exercicios.length} exercícios carregados');
-
-      // Mostrar detalhes dos exercícios
-      for (var i = 0; i < _exercicios.length; i++) {
-        debugPrint('   Exercício $i: ${_exercicios[i]['nome'] ?? 'Sem nome'}');
+      // Se ainda não tem registro detalhado, cria baseado no planejado
+      if (map['registroSeries'] == null) {
+        int seriesTotal = (map['series'] as num?)?.toInt() ?? 3;
+        map['registroSeries'] = List.generate(
+            seriesTotal,
+            (index) => {
+                  'feito': false,
+                  'peso': map['cargaSugerida'],
+                  'reps': map['repeticoes'],
+                });
+      } else {
+        // Converte de dynamic para List<Map> se vier do banco
+        map['registroSeries'] = List<Map<String, dynamic>>.from(
+            (map['registroSeries'] as List)
+                .map((s) => Map<String, dynamic>.from(s)));
       }
+      return map;
+    }).toList();
 
-      // Calcular calorias iniciais
-      for (var ex in _exercicios) {
-        if (ex['concluido'] == true) {
-          _calorias += (ex['calorias'] as num?)?.toDouble() ?? 0.0;
-        }
-      }
-
-      debugPrint('🔥 Calorias iniciais: $_calorias kcal');
-    });
+    // Encontrar o primeiro exercício não concluído para expandir
+    _expandedIndex =
+        _exercicios.indexWhere((ex) => (ex['concluido'] ?? false) == false);
+    if (_expandedIndex == -1) _expandedIndex = 0;
   }
 
-  void _simularHeartRate() {
-    Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_isRunning) {
-        setState(() {
-          _heartRate = 120 + (DateTime.now().second % 20);
-        });
-      }
+  void _iniciarTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() => _segundos++);
     });
   }
 
   void _toggleTimer() {
-    if (_isRunning) {
-      _timer?.cancel();
-    } else {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() => _segundos++);
+    setState(() {
+      if (_isRunning) {
+        _timer?.cancel();
+      } else {
+        _iniciarTimer();
+      }
+      _isRunning = !_isRunning;
+    });
+  }
+
+  // --- LÓGICA DE SÉRIE A SÉRIE ---
+  Future<void> _marcarSerieFeita(int exercicioIndex, int serieIndex) async {
+    final ex = _exercicios[exercicioIndex];
+    final serieAtual = ex['registroSeries'][serieIndex];
+
+    // Se já está feita, não faz nada (ou poderia permitir desmarcar, mas vamos focar em progresso)
+    if (serieAtual['feito'] == true) return;
+
+    // 1. Confirmação de Carga/Reps
+    final cargaCtrl =
+        TextEditingController(text: serieAtual['peso'].toString());
+    final repsCtrl = TextEditingController(text: serieAtual['reps'].toString());
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardWhite,
+        title: Text("${ex['nome']} - Série ${serieIndex + 1}"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: cargaCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Carga (kg)', suffixText: 'kg'),
+                keyboardType: TextInputType.number),
+            const SizedBox(height: 12),
+            TextField(
+                controller: repsCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Repetições', suffixText: 'reps'),
+                keyboardType: TextInputType.number),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _salvarSerie(exercicioIndex, serieIndex,
+                  double.tryParse(cargaCtrl.text), int.tryParse(repsCtrl.text));
+            },
+            child: const Text("Concluir Série"),
+          )
+        ],
+      ),
+    );
+  }
+
+  Future<void> _salvarSerie(
+      int exIdx, int serieIdx, double? peso, int? reps) async {
+    setState(() {
+      _exercicios[exIdx]['registroSeries'][serieIdx]['feito'] = true;
+      _exercicios[exIdx]['registroSeries'][serieIdx]['peso'] = peso;
+      _exercicios[exIdx]['registroSeries'][serieIdx]['reps'] = reps;
+
+      // Verifica se acabou todas as séries deste exercício
+      bool todasFeitas =
+          _exercicios[exIdx]['registroSeries'].every((s) => s['feito'] == true);
+      _exercicios[exIdx]['concluido'] = todasFeitas;
+
+      // Auto-expandir próximo exercício se este acabou
+      if (todasFeitas && exIdx < _exercicios.length - 1) {
+        _expandedIndex = exIdx + 1;
+      }
+    });
+
+    if (await Vibration.hasVibrator()) Vibration.vibrate(duration: 50);
+
+    // Salva progresso parcial
+    if (_treinoDocId.isNotEmpty && user != null) {
+      // Calcula % geral baseado em SÉRIES totais, não exercícios
+      // Lógica simplificada: % baseada em exercícios concluídos para a Home
+      int feitos = _exercicios.where((e) => e['concluido'] == true).length;
+      double pct = feitos / _exercicios.length * 100;
+
+      await _firestore
+          .collection('usuarios')
+          .doc(user!.uid)
+          .collection('treinos')
+          .doc(_treinoDocId)
+          .update({
+        'exercicios': _exercicios,
+        'porcentagem': pct,
       });
     }
-    setState(() => _isRunning = !_isRunning);
+
+    // Timer de Descanso (Baseado no exercício)
+    if (mounted) {
+      final tempoDescanso = _exercicios[exIdx]['descansoSegundos'] ?? 60;
+      showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (_) => TimerDescansoModal(
+                tempoInicialSegundos: tempoDescanso,
+                onTimerFinalizado: () {},
+              ));
+    }
   }
 
-  Future<void> _marcarExercicioConcluido(int index) async {
-    final jaEstaConcluido = _exercicios[index]['concluido'] ?? false;
+  // --- FINALIZAÇÃO ---
+  Future<void> _finalizarTreino() async {
+    setState(() => _isFinalizing = true);
+    _timer?.cancel();
 
-    setState(() {
-      _exercicios[index]['concluido'] = !jaEstaConcluido;
+    try {
+      final batch = _firestore.batch();
+      final userId = user!.uid;
 
-      // Atualizar calorias
-      if (_exercicios[index]['concluido'] == true) {
-        _calorias +=
-            (_exercicios[index]['calorias'] as num?)?.toDouble() ?? 0.0;
-      } else {
-        _calorias -=
-            (_exercicios[index]['calorias'] as num?)?.toDouble() ?? 0.0;
+      // Calcular calorias reais baseadas em séries feitas
+      // (Ex: 10 kcal por série média)
+      double caloriasReais = 0;
+      for (var ex in _exercicios) {
+        for (var s in ex['registroSeries']) {
+          if (s['feito'] == true) {
+            caloriasReais +=
+                (ex['calorias'] ?? 30) / (ex['registroSeries'] as List).length;
+          }
+        }
       }
-    });
 
-    // Feedback háptico
-    if (await Vibration.hasVibrator()) {
-      if (_exercicios[index]['concluido'] == true) {
-        Vibration.vibrate(duration: 50);
+      // 1. Salva Histórico
+      final historicoRef = _firestore
+          .collection('usuarios')
+          .doc(userId)
+          .collection('historico_concluido')
+          .doc();
+      batch.set(historicoRef, {
+        ...widget.workout,
+        'exercicios': _exercicios,
+        'tempoReal': _segundos, // Salva o tempo REAL do cronômetro
+        'caloriasQueimadas': caloriasReais,
+        'finalizadoEm': FieldValue.serverTimestamp(),
+        'status': 'concluido',
+      });
+
+      // 2. Atualiza Agenda (Não deleta!)
+      if (_treinoDocId.isNotEmpty) {
+        final agendaRef = _firestore
+            .collection('usuarios')
+            .doc(userId)
+            .collection('treinos')
+            .doc(_treinoDocId);
+        batch.update(agendaRef, {
+          'concluido': true,
+          'porcentagem': 100.0,
+          'tempoReal':
+              _segundos, // Atualiza o tempo na agenda também para a Home ler
+          'caloriasQueimadas': caloriasReais,
+          'status': 'concluido',
+        });
       }
-    }
 
-    // Verificar se completou todos
-    final todosConcluidos = _exercicios.every((e) => e['concluido'] == true);
-    if (todosConcluidos && !_mostrarParabens) {
-      _mostrarDialogParabens();
-    }
+      await batch.commit();
+      _confettiController.play();
+      NotificationService().showNotification(
+          title: 'Treino Concluído!', body: 'Parabéns! Foco total.');
 
-    // Salvar no Firestore
-    await _salvarProgresso();
-  }
-
-  void _mostrarDialogParabens() {
-    setState(() => _mostrarParabens = true);
-    _confettiController.play();
-
-    // ⬇️ ADICIONA ESTAS 4 LINHAS AQUI
-    NotificationService().showNotification(
-      title: '🎉 Treino Concluído!',
-      body:
-          'Queimaste ${_calorias.toStringAsFixed(0)} kcal! Excelente trabalho! 💪',
-    );
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.emoji_events,
-                  size: 64,
-                  color: AppColors.primaryGreen,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '🎉 Parabéns!',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Você completou todos os exercícios!',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textGray,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_calorias.toStringAsFixed(0)} kcal queimadas',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.primaryGreen,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop(); // Volta pra tela inicial
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                  ),
-                  child: const Text('Finalizar'),
-                ),
-              ),
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Treino Finalizado! 🏆"),
+            content: Text("Tempo Total: ${_formatarTempo(_segundos)}"),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context); // Fecha TelaTreinoAtivo
+                  Navigator.pop(context); // Fecha TelaDetalheTreino
+                },
+                child: const Text("FINALIZAR"),
+              )
             ],
           ),
-        ),
-      ).animate().scale(duration: 300.ms, curve: Curves.elasticOut).fadeIn(),
-    );
-  }
-
-  Future<void> _salvarProgresso() async {
-    if (user == null) return;
-
-    final createdAt = widget.workout['createdAt'] as Timestamp?;
-    if (createdAt == null) return;
-
-    final date = createdAt.toDate();
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-
-    // Calcular porcentagem
-    int totalSeries = 0;
-    int seriesConcluidas = 0;
-    for (var ex in _exercicios) {
-      final series = (ex['series'] as num?)?.toInt() ?? 0;
-      totalSeries += series;
-      if (ex['concluido'] == true) seriesConcluidas += series;
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Erro: $e")));
+    } finally {
+      if (mounted) setState(() => _isFinalizing = false);
     }
-    final porcentagem =
-        totalSeries > 0 ? (seriesConcluidas / totalSeries) * 100 : 0.0;
-
-    await _firestore
-        .collection('usuarios')
-        .doc(user!.uid)
-        .collection('treinos')
-        .doc(normalizedDate.toIso8601String())
-        .update({
-      'exercicios': _exercicios,
-      'porcentagem': porcentagem,
-      'ultimaAtualizacao': FieldValue.serverTimestamp(),
-    });
   }
 
-  String _formatarTempo(int segundos) {
-    final horas = segundos ~/ 3600;
-    final minutos = (segundos % 3600) ~/ 60;
-    final segs = segundos % 60;
-    return '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}:${segs.toString().padLeft(2, '0')}';
+  String _formatarTempo(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    final sec = s % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-    final musculos = widget.workout['musculos'] ?? 'Treino';
-
-    final totalExercicios = _exercicios.length;
-    final concluidos = _exercicios.where((e) => e['concluido'] == true).length;
-    final porcentagemConclusao =
-        totalExercicios > 0 ? (concluidos / totalExercicios * 100).toInt() : 0;
-
-    // DEBUG
-    debugPrint('🎨 BUILD - Total exercícios: $totalExercicios');
+    // Contagem de séries totais vs feitas para barra de progresso mais precisa
+    int totalSeries = 0;
+    int feitasSeries = 0;
+    for (var ex in _exercicios) {
+      var series = ex['registroSeries'] as List;
+      totalSeries += series.length;
+      feitasSeries += series.where((s) => s['feito'] == true).length;
+    }
+    double progress = totalSeries > 0 ? feitasSeries / totalSeries : 0;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -323,453 +314,200 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
           SafeArea(
             child: Column(
               children: [
-                // HEADER
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          if (_isRunning) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Sair do treino?'),
-                                content: const Text(
-                                    'O cronômetro está rodando. Deseja realmente sair?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Cancelar'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      Navigator.pop(context);
-                                    },
-                                    child: const Text('Sair'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                        icon: const Icon(Icons.arrow_back_ios),
-                        color: AppColors.textDark,
-                      ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Text(
-                              musculos,
-                              style: Theme.of(context).textTheme.titleLarge,
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$concluidos/$totalExercicios exercícios',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textGray,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.more_horiz),
-                        color: AppColors.textDark,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // BARRA DE PROGRESSO
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Progresso',
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          Text(
-                            '$porcentagemConclusao%',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  color: AppColors.primaryGreen,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: totalExercicios > 0
-                              ? porcentagemConclusao / 100
-                              : 0,
-                          backgroundColor:
-                              AppColors.textLight.withValues(alpha: 0.2),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            AppColors.primaryGreen,
-                          ),
-                          minHeight: 8,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // CONTEÚDO SCROLLÁVEL
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: [
-                        // MÉTRICAS
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricCard(
-                                Icons.local_fire_department,
-                                _calorias.toStringAsFixed(0),
-                                strings.kcal,
-                                strings.calories,
-                                AppColors.accentOrange,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildMetricCard(
-                                Icons.favorite,
-                                '$_heartRate',
-                                'bpm',
-                                'Heart Rate',
-                                AppColors.accentPink,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // TIMER
-                        _buildTimerCard(),
-
-                        const SizedBox(height: 24),
-
-                        // LISTA DE EXERCÍCIOS - VERSÃO CORRIGIDA
-                        // LISTA DE EXERCÍCIOS - VERSÃO ULTRA SIMPLIFICADA
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardWhite,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: AppTheme.cardShadow,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Exercícios ($totalExercicios)',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 16),
-
-                              // EXERCÍCIO 1
-                              if (_exercicios.isNotEmpty)
-                                _buildExercicioItem(0),
-                              if (_exercicios.length > 1) ...[
-                                const SizedBox(height: 12),
-                                _buildExercicioItem(1),
-                              ],
-                              if (_exercicios.length > 2) ...[
-                                const SizedBox(height: 12),
-                                _buildExercicioItem(2),
-                              ],
-                              if (_exercicios.length > 3) ...[
-                                const SizedBox(height: 12),
-                                _buildExercicioItem(3),
-                              ],
-                              if (_exercicios.length > 4) ...[
-                                const SizedBox(height: 12),
-                                _buildExercicioItem(4),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 100),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // BOTÃO PLAY/PAUSE FIXO
+                // HEADER TIMER
                 Container(
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardWhite,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _toggleTimer,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            _isRunning ? AppColors.error : AppColors.textDark,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  color: AppColors.backgroundLight,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_down),
+                          onPressed: () => Navigator.pop(context)),
+                      Column(
                         children: [
-                          Icon(
-                            _isRunning ? Icons.pause : Icons.play_arrow,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _isRunning ? 'Pausar Treino' : 'Iniciar Treino',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const Text("TEMPO DECORRIDO",
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  letterSpacing: 1,
+                                  color: AppColors.textGray)),
+                          GestureDetector(
+                            onTap: _toggleTimer,
+                            child: Text(_formatarTempo(_segundos),
+                                style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Monospace',
+                                    color: _isRunning
+                                        ? AppColors.textDark
+                                        : AppColors.textGray)),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                ),
+
+                LinearProgressIndicator(
+                    value: progress,
+                    color: AppColors.primaryGreen,
+                    backgroundColor: Colors.grey[200],
+                    minHeight: 6),
+
+                // LISTA DE EXERCÍCIOS (EXPANDABLE)
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _exercicios.length + 1,
+                    itemBuilder: (ctx, idx) {
+                      if (idx == _exercicios.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: ElevatedButton(
+                            onPressed: _isFinalizing ? null : _finalizarTreino,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                padding: const EdgeInsets.all(20)),
+                            child: _isFinalizing
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text("FINALIZAR TREINO",
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                          ),
+                        );
+                      }
+                      return _buildExercicioCard(idx);
+                    },
                   ),
                 ),
               ],
             ),
           ),
-
-          // CONFETTI
           Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              colors: const [
-                AppColors.primaryGreen,
-                AppColors.primaryPurple,
-                AppColors.accentOrange,
-                AppColors.accentPink,
-              ],
-              numberOfParticles: 30,
-              gravity: 0.3,
-            ),
-          ),
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  shouldLoop: false)),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCard(
-    IconData icon,
-    String value,
-    String unit,
-    String label,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textGray,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                value,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(width: 4),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  unit,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimerCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primaryGreen, AppColors.primaryPurple],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGreen.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Tempo',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _formatarTempo(_segundos),
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: Colors.white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExercicioItem(int index) {
+  Widget _buildExercicioCard(int index) {
     final ex = _exercicios[index];
-    final nome = ex['nome'] ?? 'Exercício ${index + 1}';
-    final series = ex['series'] ?? 0;
-    final repeticoes = ex['repeticoes'] ?? 0;
-    final concluido = ex['concluido'] ?? false;
+    final bool isConcluido = ex['concluido'] == true;
+    final bool isExpanded = _expandedIndex == index;
+    final List series = ex['registroSeries'];
 
-    return GestureDetector(
-      onTap: () => _marcarExercicioConcluido(index),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: concluido
-              ? AppColors.primaryGreen.withValues(alpha: 0.1)
-              : AppColors.backgroundLight,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: isExpanded ? 4 : 1,
+      shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: concluido ? AppColors.primaryGreen : Colors.transparent,
-            width: 2,
+          side: BorderSide(
+              color: isConcluido ? AppColors.primaryGreen : Colors.transparent,
+              width: 2)),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: index == _expandedIndex,
+          onExpansionChanged: (val) {
+            if (val) setState(() => _expandedIndex = index);
+          },
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: isConcluido
+                    ? AppColors.primaryGreen
+                    : AppColors.primaryPurple.withValues(alpha: 0.1),
+                shape: BoxShape.circle),
+            child: Icon(isConcluido ? Icons.check : Icons.fitness_center,
+                color: isConcluido ? Colors.white : AppColors.primaryPurple,
+                size: 20),
           ),
-        ),
-        child: Row(
+          title: Text(ex['nome'],
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(
+              "${series.where((s) => s['feito']).length}/${series.length} séries"),
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: concluido ? AppColors.primaryGreen : Colors.transparent,
-                border: Border.all(
-                  color:
-                      concluido ? AppColors.primaryGreen : AppColors.textLight,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: concluido
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    nome,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          decoration:
-                              concluido ? TextDecoration.lineThrough : null,
+                children: List.generate(series.length, (serieIdx) {
+                  final s = series[serieIdx];
+                  final bool feita = s['feito'] == true;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: feita
+                            ? AppColors.primaryGreen.withValues(alpha: 0.1)
+                            : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: feita
+                                ? AppColors.primaryGreen
+                                : Colors.grey[200]!)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.grey[300],
+                                child: Text("${serieIdx + 1}",
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.black))),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    feita
+                                        ? "${s['peso']}kg"
+                                        : "${ex['cargaSugerida']}kg (Meta)",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: feita
+                                            ? Colors.black
+                                            : Colors.grey)),
+                                Text(
+                                    feita
+                                        ? "${s['reps']} reps"
+                                        : "${ex['repeticoes']} reps",
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ],
                         ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$series séries × $repeticoes reps',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textGray,
-                        ),
-                  ),
-                ],
+                        if (feita)
+                          const Icon(Icons.check_circle,
+                              color: AppColors.primaryGreen)
+                        else
+                          ElevatedButton(
+                            onPressed: () => _marcarSerieFeita(index, serieIdx),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryPurple,
+                                minimumSize: const Size(80, 30),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12)),
+                            child: const Text("Check",
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.white)),
+                          )
+                      ],
+                    ),
+                  );
+                }),
               ),
-            ),
-            if (concluido)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '✓',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ),
+            )
           ],
         ),
       ),

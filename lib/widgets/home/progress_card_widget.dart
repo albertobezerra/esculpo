@@ -9,11 +9,13 @@ import 'circular_progress_painter.dart';
 class ProgressCardWidget extends StatelessWidget {
   final int rebuildKey;
   final Future<Map<String, dynamic>?> Function(DateTime) getCachedWorkout;
+  final VoidCallback? onTreinoFinalizado;
 
   const ProgressCardWidget({
     super.key,
     required this.rebuildKey,
     required this.getCachedWorkout,
+    this.onTreinoFinalizado,
   });
 
   @override
@@ -29,26 +31,33 @@ class ProgressCardWidget extends StatelessWidget {
         }
 
         final workout = snapshot.data;
-        final musculos =
-            workout?['musculos'] ?? strings.noWorkout.toUpperCase();
-        final porcentagem =
-            (workout?['porcentagem'] as num?)?.toDouble() ?? 0.0;
-        final temExercicios =
-            (workout?['treinos'] as List?)?.isNotEmpty ?? false;
-        final tempoEstimado = workout?['tempoEstimado'] ?? 0;
+        if (workout == null) return const SizedBox();
+
+        final musculos = workout['musculos'] ?? strings.noWorkout.toUpperCase();
+        final porcentagem = (workout['porcentagem'] as num?)?.toDouble() ?? 0.0;
+        final treinosList = workout['treinos'] as List?;
+        final exerciciosList = workout['exercicios'] as List?;
+        final temExercicios = (treinosList?.isNotEmpty ?? false) ||
+            (exerciciosList?.isNotEmpty ?? false);
+        final tempoEstimado = workout['tempoEstimado'] ?? 0;
+
+        // --- LÓGICA DE CONCLUÍDO ---
+        final bool isConcluido =
+            porcentagem >= 100.0 || workout['concluido'] == true;
 
         return GestureDetector(
           onTap: temExercicios
-              ? () {
-                  Navigator.push(
+              ? () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => TelaDetalheTreino(
-                        workout: workout!,
+                        workout: workout,
                         treinoDocId: workout['treinoDocId'] as String,
                       ),
                     ),
                   );
+                  if (onTreinoFinalizado != null) onTreinoFinalizado!();
                 }
               : null,
           child: Container(
@@ -57,13 +66,33 @@ class ProgressCardWidget extends StatelessWidget {
               color: AppColors.cardWhite,
               borderRadius: BorderRadius.circular(24),
               boxShadow: AppTheme.cardShadow,
+              // Borda verde sutil se concluído
+              border: isConcluido
+                  ? Border.all(color: AppColors.primaryGreen, width: 1)
+                  : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  strings.todayWorkout,
-                  style: Theme.of(context).textTheme.titleLarge,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isConcluido
+                          ? "Treino Concluído! 🎉"
+                          : strings.todayWorkout,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: isConcluido
+                              ? AppColors.primaryGreen
+                              : AppColors.textDark,
+                          fontWeight: isConcluido
+                              ? FontWeight.bold
+                              : FontWeight.normal),
+                    ),
+                    if (isConcluido)
+                      const Icon(Icons.check_circle,
+                          color: AppColors.primaryGreen)
+                  ],
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -77,17 +106,22 @@ class ProgressCardWidget extends StatelessWidget {
                             size: const Size(90, 90),
                             painter: CircularProgressPainter(
                               progress: porcentagem / 100,
-                              color: AppColors.primaryGreen,
+                              color: isConcluido
+                                  ? AppColors.primaryGreen
+                                  : AppColors.primaryGreen,
                             ),
                           ),
                           Center(
-                            child: Text(
-                              '${porcentagem.toStringAsFixed(0)}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            child: isConcluido
+                                ? const Icon(Icons.thumb_up,
+                                    color: AppColors.primaryGreen, size: 32)
+                                : Text(
+                                    '${porcentagem.toStringAsFixed(0)}%',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
                           ),
                         ],
                       ),
@@ -111,7 +145,10 @@ class ProgressCardWidget extends StatelessWidget {
                                     size: 16, color: AppColors.textGray),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '$tempoEstimado ${strings.minutes}',
+                                  // Se concluiu, mostra texto fixo ou o tempo real se vc tiver salvo
+                                  isConcluido
+                                      ? "Finalizado"
+                                      : '$tempoEstimado ${strings.minutes}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -126,22 +163,42 @@ class ProgressCardWidget extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => TelaDetalheTreino(
-                              workout: workout!,
+                              workout: workout,
                               treinoDocId: workout['treinoDocId'] as String,
                             ),
                           ),
                         );
+                        if (onTreinoFinalizado != null) onTreinoFinalizado!();
                       },
-                      icon: const Icon(Icons.play_arrow, size: 20),
-                      label: Text(strings.continueWorkout),
+                      // MUDANÇA VISUAL AQUI
+                      icon: Icon(
+                          isConcluido ? Icons.visibility : Icons.play_arrow,
+                          size: 20,
+                          color: isConcluido
+                              ? AppColors.primaryGreen
+                              : Colors.white),
+                      label: Text(
+                          isConcluido
+                              ? "Ver Detalhes"
+                              : strings.continueWorkout,
+                          style: TextStyle(
+                              color: isConcluido
+                                  ? AppColors.primaryGreen
+                                  : Colors.white,
+                              fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.textDark,
+                        backgroundColor:
+                            isConcluido ? Colors.white : AppColors.textDark,
+                        side: isConcluido
+                            ? const BorderSide(color: AppColors.primaryGreen)
+                            : null,
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: isConcluido ? 0 : 2,
                       ),
                     ),
                   ),

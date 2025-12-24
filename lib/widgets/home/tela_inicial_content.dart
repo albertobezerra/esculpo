@@ -23,6 +23,8 @@ class TelaInicialContent extends ConsumerStatefulWidget {
 class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final user = FirebaseAuth.instance.currentUser;
+
+  // Chave para forçar reconstrução
   int _rebuildKey = 0;
   final Map<String, Future<Map<String, dynamic>?>> _workoutCache = {};
 
@@ -32,7 +34,18 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
     _checkOnboardingAndGeneratePlan();
   }
 
-  void _clearCache() => _workoutCache.clear();
+  // DENTRO DE lib/widgets/home/tela_inicial_content.dart
+
+  // Limpa o cache e força a tela a redesenhar
+  void _refreshData() {
+    // CORREÇÃO DO ERRO DE CRASH
+    if (!mounted) return;
+
+    setState(() {
+      _workoutCache.clear();
+      _rebuildKey++;
+    });
+  }
 
   Future<Map<String, dynamic>?> getCachedWorkout(DateTime date) {
     final key = '${date.year}-${date.month}-${date.day}';
@@ -64,11 +77,10 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
 
       if (!planSnapshot.exists) {
         try {
-          await ref.read(geradorTreinosProvider).gerarPlanoCompleto(
-                usuarioId: userId,
-              );
-          _clearCache();
-          setState(() => _rebuildKey++);
+          await ref
+              .read(geradorTreinosProvider)
+              .gerarPlanoCompleto(usuarioId: userId);
+          _refreshData(); // Usa o método novo
         } catch (e) {
           debugPrint('❌ Erro ao gerar plano: $e');
         }
@@ -84,7 +96,8 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
       final geradorTreinos = ref.read(geradorTreinosProvider);
       final workout = await geradorTreinos.gerarTreinoDiario(userId, date);
 
-      if (workout == null || workout['treinos'] == null) {
+      if (workout == null ||
+          (workout['treinos'] == null && workout['exercicios'] == null)) {
         return {
           'tipo': 'Sem treino',
           'musculos': 'DESCANSO',
@@ -92,7 +105,6 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
           'treinos': [],
         };
       }
-
       return workout;
     } catch (e) {
       return {
@@ -109,39 +121,55 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
     AppStrings.of(context);
 
     return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-            child: HeaderWidget(),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  StreakBadgeWidget(),
-                  const SizedBox(height: 24),
-                  ProgressCardWidget(
-                    rebuildKey: _rebuildKey,
-                    getCachedWorkout: getCachedWorkout,
-                  ),
-                  const SizedBox(height: 24),
-                  WorkoutCalendarWidget(
-                    rebuildKey: _rebuildKey,
-                    getCachedWorkout: getCachedWorkout,
-                  ),
-                  const SizedBox(height: 24),
-                  MetricsWidget(rebuildKey: _rebuildKey),
-                  const SizedBox(height: 24),
-                  ProgressPhotosCardWidget(),
-                  const SizedBox(height: 24),
-                ],
+      child: RefreshIndicator(
+        // Bônus: Permite arrastar pra baixo pra atualizar
+        onRefresh: () async {
+          _refreshData();
+          await Future.delayed(const Duration(seconds: 1));
+        },
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: HeaderWidget(),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    StreakBadgeWidget(
+                        key:
+                            ValueKey('streak_$_rebuildKey')), // Atualiza streak
+                    const SizedBox(height: 24),
+
+                    // --- AQUI ESTÁ A LIGAÇÃO ---
+                    ProgressCardWidget(
+                      rebuildKey: _rebuildKey,
+                      getCachedWorkout: getCachedWorkout,
+                      onTreinoFinalizado:
+                          _refreshData, // <--- Passamos o refresh aqui!
+                    ),
+                    // ---------------------------
+
+                    const SizedBox(height: 24),
+                    WorkoutCalendarWidget(
+                      rebuildKey: _rebuildKey,
+                      getCachedWorkout: getCachedWorkout,
+                    ),
+                    const SizedBox(height: 24),
+                    MetricsWidget(rebuildKey: _rebuildKey),
+                    const SizedBox(height: 24),
+                    ProgressPhotosCardWidget(),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
