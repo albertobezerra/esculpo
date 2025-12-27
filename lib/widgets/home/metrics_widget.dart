@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/core/i18n/app_strings.dart';
+// IMPORTANTE: Adicione o import da tela nova
+import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
 
 class MetricsWidget extends StatelessWidget {
   final int rebuildKey;
@@ -57,6 +59,13 @@ class MetricsWidget extends StatelessWidget {
     }
   }
 
+  void _abrirEvolucao(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaFotosProgresso()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
@@ -64,11 +73,36 @@ class MetricsWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          strings.metrics,
-          style: Theme.of(context).textTheme.titleLarge,
+        // TÍTULO CLICÁVEL COM ÍCONE DE SETA
+        InkWell(
+          onTap: () => _abrirEvolucao(context),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  strings.metrics, // "Métricas"
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Row(
+                  children: [
+                    Text("Ver Evolução",
+                        style: TextStyle(
+                            color: AppColors.primaryPurple,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                    Icon(Icons.chevron_right,
+                        color: AppColors.primaryPurple, size: 20),
+                  ],
+                )
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+
         FutureBuilder<Map<String, double>>(
           key: ValueKey('${rebuildKey}_metrics'),
           future: _getProgressData(),
@@ -130,41 +164,47 @@ class MetricsWidget extends StatelessWidget {
     String label,
     Color color,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.subtleShadow,
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+    return GestureDetector(
+      // Tornar o card clicável também
+      onTap: () => _abrirEvolucao(context),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardWhite,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppTheme.subtleShadow,
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          Text(
-            unit,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            Text(
+              unit,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

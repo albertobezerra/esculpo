@@ -9,6 +9,7 @@ import 'package:confetti/confetti.dart';
 import 'package:guarda_corpo_2024/servicos/notification_service.dart';
 import 'package:vibration/vibration.dart';
 import '../widgets/timer/timer_descanso_modal.dart';
+import 'tela_detalhe_exercicio.dart';
 
 class TelaTreinoAtivo extends StatefulWidget {
   final Map<String, dynamic> workout;
@@ -407,10 +408,12 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: isExpanded ? 4 : 1,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-              color: isConcluido ? AppColors.primaryGreen : Colors.transparent,
-              width: 2)),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isConcluido ? AppColors.primaryGreen : Colors.transparent,
+          width: 2,
+        ),
+      ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -419,21 +422,57 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
             if (val) setState(() => _expandedIndex = index);
           },
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+
+          // ÍCONE DE STATUS À ESQUERDA
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-                color: isConcluido
-                    ? AppColors.primaryGreen
-                    : AppColors.primaryPurple.withValues(alpha: 0.1),
-                shape: BoxShape.circle),
-            child: Icon(isConcluido ? Icons.check : Icons.fitness_center,
-                color: isConcluido ? Colors.white : AppColors.primaryPurple,
-                size: 20),
+              color: isConcluido
+                  ? AppColors.primaryGreen
+                  : AppColors.primaryPurple.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isConcluido ? Icons.check : Icons.fitness_center,
+              color: isConcluido ? Colors.white : AppColors.primaryPurple,
+              size: 20,
+            ),
           ),
-          title: Text(ex['nome'],
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+
+          // TÍTULO COM BOTÃO DE INFO
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  ex['nome'],
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.info_outline,
+                    color: AppColors.primaryPurple, size: 22),
+                constraints:
+                    const BoxConstraints(), // Remove padding extra do IconButton
+                padding: const EdgeInsets.only(left: 8),
+                onPressed: () {
+                  // Abre a tela de detalhes (manual) do exercício
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TelaDetalheExercicio(exercicio: ex),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
           subtitle: Text(
-              "${series.where((s) => s['feito']).length}/${series.length} séries"),
+            "${series.where((s) => s['feito']).length}/${series.length} séries",
+            style: const TextStyle(color: Colors.grey),
+          ),
+
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -445,62 +484,102 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                        color: feita
-                            ? AppColors.primaryGreen.withValues(alpha: 0.1)
-                            : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: feita
-                                ? AppColors.primaryGreen
-                                : Colors.grey[200]!)),
+                      color: feita
+                          ? AppColors.primaryGreen.withValues(alpha: 0.1)
+                          : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color:
+                            feita ? AppColors.primaryGreen : Colors.grey[200]!,
+                      ),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                                radius: 12,
-                                backgroundColor: Colors.grey[300],
-                                child: Text("${serieIdx + 1}",
-                                    style: const TextStyle(
-                                        fontSize: 12, color: Colors.black))),
+                            // NÚMERO DA SÉRIE
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: feita
+                                    ? AppColors.primaryGreen
+                                    : Colors.grey[300],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "${serieIdx + 1}",
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: feita
+                                          ? Colors.white
+                                          : Colors.black54),
+                                ),
+                              ),
+                            ),
                             const SizedBox(width: 12),
+                            // INFO DA CARGA
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                    feita
-                                        ? "${s['peso']}kg"
-                                        : "${ex['cargaSugerida']}kg (Meta)",
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: feita
-                                            ? Colors.black
-                                            : Colors.grey)),
+                                  feita
+                                      ? "${s['peso']}kg"
+                                      : "${ex['cargaSugerida']}kg",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: feita
+                                        ? Colors.black
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
                                 Text(
-                                    feita
-                                        ? "${s['reps']} reps"
-                                        : "${ex['repeticoes']} reps",
-                                    style: const TextStyle(
-                                        fontSize: 12, color: Colors.grey)),
+                                  feita
+                                      ? "${s['reps']} reps"
+                                      : "${ex['repeticoes']} reps (meta)",
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Colors.grey),
+                                ),
                               ],
                             ),
                           ],
                         ),
+                        // AÇÃO (CHECK / BOTÃO)
                         if (feita)
-                          const Icon(Icons.check_circle,
-                              color: AppColors.primaryGreen)
+                          IconButton(
+                            icon: const Icon(Icons.undo,
+                                color: Colors.grey, size: 20),
+                            onPressed: () {
+                              // Opcional: Permitir desfazer
+                              setState(() {
+                                _exercicios[index]['registroSeries'][serieIdx]
+                                    ['feito'] = false;
+                                _exercicios[index]['concluido'] =
+                                    false; // Reabre o exercício
+                              });
+                            },
+                          )
                         else
                           ElevatedButton(
                             onPressed: () => _marcarSerieFeita(index, serieIdx),
                             style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryPurple,
-                                minimumSize: const Size(80, 30),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12)),
-                            child: const Text("Check",
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.white)),
+                              backgroundColor: AppColors.primaryPurple,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                            ),
+                            child: const Text(
+                              "CONCLUIR",
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
                           )
                       ],
                     ),

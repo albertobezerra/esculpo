@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -269,33 +267,7 @@ class _TelaAdicionarFotoProgressoState
                   ),
                 ],
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    final user = FirebaseAuth.instance.currentUser;
-                    debugPrint('🔐 Usuário: ${user?.uid}');
-                    debugPrint('🔐 Email: ${user?.email}');
 
-                    // Tenta escrever um documento de teste
-                    await FirebaseFirestore.instance.collection('teste').add({
-                      'mensagem': 'teste',
-                      'timestamp': FieldValue.serverTimestamp(),
-                    });
-
-                    debugPrint('✅ Firestore funcionando!');
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('✅ Firestore funcionando!')),
-                    );
-                  } catch (e) {
-                    debugPrint('❌ Erro Firestore: $e');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('❌ Erro: $e')),
-                    );
-                  }
-                },
-                child: Text('Testar Firestore'),
-              ),
               SizedBox(height: 24),
 
               // Campos de Dados

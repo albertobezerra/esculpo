@@ -8,6 +8,7 @@ import '../core/theme/app_theme.dart';
 import 'tela_adicionar_foto_progresso.dart';
 import 'tela_comparacao_fotos.dart';
 import 'tela_detalhe_foto_progresso.dart';
+import '../widgets/grafico_evolucao_widget.dart';
 
 class TelaFotosProgresso extends ConsumerWidget {
   const TelaFotosProgresso({super.key});
@@ -56,6 +57,11 @@ class TelaFotosProgresso extends ConsumerWidget {
               children: [
                 _buildCardComparacao(context, fotoServico),
                 SizedBox(height: 24),
+                // NOVO: Gráfico de Evolução
+                GraficoEvolucaoWidget(),
+                SizedBox(height: 24),
+                // -----------------------
+
                 _buildEstatisticas(fotos),
                 SizedBox(height: 24),
                 Text(

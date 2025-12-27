@@ -162,8 +162,6 @@ class _TelaInicialContentState extends ConsumerState<TelaInicialContent> {
                     const SizedBox(height: 24),
                     MetricsWidget(rebuildKey: _rebuildKey),
                     const SizedBox(height: 24),
-                    ProgressPhotosCardWidget(),
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
