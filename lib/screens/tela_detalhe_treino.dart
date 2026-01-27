@@ -117,8 +117,9 @@ class _TelaDetalheTreinoState extends State<TelaDetalheTreino> {
       }
 
       // Se ainda for zero, aí sim usa o estimado (melhor que nada)
-      if (caloriasReais == 0)
+      if (caloriasReais == 0) {
         caloriasReais = (data['caloriasEstimadas'] as num?)?.toDouble() ?? 0.0;
+      }
 
       caloriasDisplay = "${caloriasReais.toStringAsFixed(0)} kcal";
     } else {

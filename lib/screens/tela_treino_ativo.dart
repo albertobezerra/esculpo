@@ -282,6 +282,7 @@ class _TelaTreinoAtivoState extends State<TelaTreinoAtivo> {
         );
       }
     } catch (e) {
+      if (!mounted) return; // ✅ Adicione esta verificação
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Erro: $e")));
     } finally {

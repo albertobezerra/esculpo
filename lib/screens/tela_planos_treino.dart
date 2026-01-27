@@ -71,6 +71,9 @@ class _TelaPlanosTreinoState extends ConsumerState<TelaPlanosTreino> {
                       if (!mounted) {
                         return; // ✅ garante que o State ainda existe
                       }
+                      if (!context.mounted) {
+                        return; // O contexto não está mais montado
+                      }
                       Navigator.of(context).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Plano atualizado!')),

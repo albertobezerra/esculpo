@@ -45,6 +45,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   circular_countdown_timer: ^0.2.4
+  http: ^1.6.0
+  riverpod_annotation: ^4.0.1
+  image_cropper: ^11.0.0
 
 dev_dependencies:
   flutter_test:

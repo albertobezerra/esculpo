@@ -177,8 +177,9 @@ class _TelaMedidasState extends State<TelaMedidas> {
                 descending: false) // Ordem crescente para o gráfico
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final docs = snapshot.data!.docs;
           if (docs.isEmpty) {

@@ -5,11 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/providers/navigation_provider.dart';
 import 'package:guarda_corpo_2024/screens/profile_screen.dart';
-import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
 import 'package:guarda_corpo_2024/widgets/home/tela_inicial_content.dart';
 import 'tela_exercicios.dart';
 import 'tela_historico_treinos.dart';
-import 'tela_planos_treino.dart';
 
 class TelaInicial extends ConsumerWidget {
   const TelaInicial({super.key});
@@ -20,11 +18,9 @@ class TelaInicial extends ConsumerWidget {
 
     final pages = <Widget>[
       const TelaInicialContent(),
-      const TelaPlanosTreino(),
-      const TelaHistoricoTreinos(),
-      const TelaExercicios(),
-      const TelaFotosProgresso(),
-      const ProfileScreen(),
+      const TelaExercicios(), // ✅ Mantém exercícios (importante)
+      const TelaHistoricoTreinos(), // ✅ Mantém histórico
+      const ProfileScreen(), // ✅ Perfil com acesso a fotos/planos
     ];
 
     return Scaffold(
@@ -51,22 +47,18 @@ class TelaInicial extends ConsumerWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavIcon(
-                  ref, Icons.home_outlined, Icons.home, 0, selectedIndex),
-              _buildNavIcon(ref, Icons.calendar_today_outlined,
-                  Icons.calendar_today, 1, selectedIndex),
-              _buildNavIcon(
-                  ref, Icons.history_outlined, Icons.history, 2, selectedIndex),
+              _buildNavIcon(ref, Icons.home_outlined, Icons.home, 0,
+                  selectedIndex, 'Início'),
               _buildNavIcon(ref, Icons.fitness_center_outlined,
-                  Icons.fitness_center, 3, selectedIndex),
-              _buildNavIcon(ref, Icons.photo_camera_outlined,
-                  Icons.photo_camera, 4, selectedIndex),
-              _buildNavIcon(
-                  ref, Icons.person_outline, Icons.person, 5, selectedIndex),
+                  Icons.fitness_center, 1, selectedIndex, 'Exercícios'),
+              _buildNavIcon(ref, Icons.history_outlined, Icons.history, 2,
+                  selectedIndex, 'Histórico'),
+              _buildNavIcon(ref, Icons.person_outline, Icons.person, 3,
+                  selectedIndex, 'Perfil'),
             ],
           ),
         ),
@@ -80,21 +72,31 @@ class TelaInicial extends ConsumerWidget {
     IconData filledIcon,
     int index,
     int currentIndex,
+    String label,
   ) {
     final isSelected = currentIndex == index;
     return GestureDetector(
       onTap: () {
         ref.read(selectedIndexProvider.notifier).state = index;
-        debugPrint('📍 Navegou para índice: $index');
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        child: Icon(
-          isSelected ? filledIcon : outlinedIcon,
-          color: isSelected ? AppColors.textDark : AppColors.textLight,
-          size: 28,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSelected ? filledIcon : outlinedIcon,
+            color: isSelected ? AppColors.textDark : AppColors.textLight,
+            size: 26,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isSelected ? AppColors.textDark : AppColors.textLight,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,56 +1,146 @@
 // lib/widgets/home/header_widget.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:guarda_corpo_2024/providers/providers.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 
-class HeaderWidget extends StatefulWidget {
+class HeaderWidget extends ConsumerWidget {
   const HeaderWidget({super.key});
 
-  @override
-  State<HeaderWidget> createState() => _HeaderWidgetState();
-}
+  Future<void> _pickAndCropImage(BuildContext context, WidgetRef ref) async {
+    try {
+      debugPrint('📸 Iniciando seleção de imagem...');
 
-class _HeaderWidgetState extends State<HeaderWidget> {
-  final user = FirebaseAuth.instance.currentUser;
-  File? _profileImage;
-  final ImagePicker _picker = ImagePicker();
+      // 1. Seleciona a imagem
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+      );
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProfileImage();
-  }
+      if (pickedFile == null) {
+        debugPrint('⚠️ Nenhuma imagem foi selecionada');
+        return;
+      }
 
-  Future<void> _loadProfileImage() async {
-    final directory = await getApplicationDocumentsDirectory();
-    final imagePath = path.join(directory.path, 'profile_image.jpg');
-    final file = File(imagePath);
-    if (await file.exists()) {
-      setState(() => _profileImage = file);
+      debugPrint('✅ Imagem selecionada: ${pickedFile.path}');
+
+      // 2. Abre o crop editor
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Editar Foto',
+            toolbarColor: AppColors.primaryPurple,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+            ],
+            activeControlsWidgetColor: AppColors.primaryGreen,
+            cropFrameColor: AppColors.primaryPurple,
+            backgroundColor: Colors.black,
+          ),
+          IOSUiSettings(
+            title: 'Editar Foto',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            aspectRatioPickerButtonHidden: true,
+            rotateButtonsHidden: false,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+            ],
+          ),
+        ],
+      );
+
+      if (croppedFile == null) {
+        debugPrint('⚠️ Crop cancelado pelo usuário');
+        return;
+      }
+
+      debugPrint('✅ Imagem cortada: ${croppedFile.path}');
+
+      // 3. Faz upload da imagem cortada
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppColors.primaryPurple),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Salvando foto...',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      // ✅ CORREÇÃO: Acessa o service e chama updateImage
+      await ref
+          .read(profileImageProvider.notifier)
+          .updateImage(File(croppedFile.path));
+
+      if (context.mounted) {
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Foto de perfil atualizada!'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      debugPrint('✅ Upload concluído com sucesso!');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Erro ao selecionar/fazer upload da imagem: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      if (context.mounted) {
+        // Tenta fechar o dialog de loading se estiver aberto
+        try {
+          Navigator.pop(context);
+        } catch (_) {}
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
-  Future<void> _saveProfileImage(File image) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final imagePath = path.join(directory.path, 'profile_image.jpg');
-    await image.copy(imagePath);
-    setState(() => _profileImage = File(imagePath));
-  }
-
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      await _saveProfileImage(File(pickedFile.path));
-    }
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    final imageState = ref.watch(profileImageProvider);
+
     final DateTime now = DateTime.now();
     final int hour = now.hour;
 
@@ -78,61 +168,82 @@ class _HeaderWidgetState extends State<HeaderWidget> {
     return Row(
       children: [
         GestureDetector(
-          onTap: _profileImage == null
-              ? _pickImage
-              : () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(
+          onTap: () {
+            if (imageState.bytes == null && !imageState.isLoading) {
+              _pickAndCropImage(context, ref);
+            } else if (imageState.bytes != null) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(
+                    Localizations.localeOf(context).languageCode == 'pt'
+                        ? 'Alterar foto'
+                        : 'Change photo',
+                  ),
+                  content: Text(
+                    Localizations.localeOf(context).languageCode == 'pt'
+                        ? 'Deseja alterar a sua foto de perfil?'
+                        : 'Do you want to change your profile photo?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
                         Localizations.localeOf(context).languageCode == 'pt'
-                            ? 'Alterar foto'
-                            : 'Change photo',
+                            ? 'Cancelar'
+                            : 'Cancel',
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(
-                            Localizations.localeOf(context).languageCode == 'pt'
-                                ? 'Cancelar'
-                                : 'Cancel',
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _pickImage();
-                          },
-                          child: Text(
-                            Localizations.localeOf(context).languageCode == 'pt'
-                                ? 'Alterar'
-                                : 'Change',
-                          ),
-                        ),
-                      ],
                     ),
-                  );
-                },
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _pickAndCropImage(context, ref);
+                      },
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'pt'
+                            ? 'Alterar'
+                            : 'Change',
+                        style: const TextStyle(color: AppColors.primaryPurple),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          },
           child: Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              image: _profileImage != null
+              image: imageState.bytes != null
                   ? DecorationImage(
-                      image: FileImage(_profileImage!),
+                      image: MemoryImage(imageState.bytes!),
                       fit: BoxFit.cover,
                     )
                   : null,
-              gradient: _profileImage == null
+              gradient: imageState.bytes == null && !imageState.isLoading
                   ? const LinearGradient(
                       colors: [AppColors.primaryGreen, AppColors.primaryPurple],
                     )
                   : null,
+              color: imageState.isLoading ? Colors.grey[300] : null,
             ),
-            child: _profileImage == null
-                ? const Icon(Icons.person, color: Colors.white, size: 28)
-                : null,
+            child: imageState.isLoading
+                ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryPurple),
+                      ),
+                    ),
+                  )
+                : imageState.bytes == null
+                    ? const Icon(Icons.person, color: Colors.white, size: 28)
+                    : null,
           ),
         ),
         const SizedBox(width: 16),
@@ -142,9 +253,10 @@ class _HeaderWidgetState extends State<HeaderWidget> {
             children: [
               Text(
                 '$greeting $emoji',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textGray,
-                    ),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppColors.textGray),
               ),
               Text(
                 userName,

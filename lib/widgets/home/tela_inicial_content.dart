@@ -11,7 +11,6 @@ import 'streak_badge_widget.dart';
 import 'progress_card_widget.dart';
 import 'workout_calendar_widget.dart';
 import 'metrics_widget.dart';
-import 'progress_photos_card_widget.dart';
 
 class TelaInicialContent extends ConsumerStatefulWidget {
   const TelaInicialContent({super.key});

@@ -125,11 +125,13 @@ class _WorkoutCalendarWidgetState extends State<WorkoutCalendarWidget> {
               Row(
                 children: [
                   Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                          color: AppColors.primaryGreen,
-                          shape: BoxShape.circle)),
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   Text("Feito", style: Theme.of(context).textTheme.bodySmall),
                 ],
@@ -149,6 +151,10 @@ class _WorkoutCalendarWidgetState extends State<WorkoutCalendarWidget> {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: TableCalendar(
             locale: 'pt_BR',
+
+            // ✅ CORREÇÃO: Permite swipe horizontal mas libera scroll vertical
+            availableGestures: AvailableGestures.horizontalSwipe,
+
             firstDay: DateTime.now().subtract(const Duration(days: 120)),
             lastDay: DateTime.now().add(const Duration(days: 30)),
             focusedDay: _focusedDay,
@@ -156,14 +162,10 @@ class _WorkoutCalendarWidgetState extends State<WorkoutCalendarWidget> {
             rowHeight: 48,
             daysOfWeekHeight: 30,
 
-            // --- CORREÇÃO AQUI ---
             daysOfWeekStyle: const DaysOfWeekStyle(
-              weekdayStyle: TextStyle(
-                  color: Colors.grey, fontSize: 13), // Era weekdayTextStyle
-              weekendStyle: TextStyle(
-                  color: Colors.grey, fontSize: 13), // Era weekendTextStyle
+              weekdayStyle: TextStyle(color: Colors.grey, fontSize: 13),
+              weekendStyle: TextStyle(color: Colors.grey, fontSize: 13),
             ),
-            // ---------------------
 
             headerStyle: const HeaderStyle(
               titleCentered: true,

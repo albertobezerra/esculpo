@@ -4,10 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:guarda_corpo_2024/servicos/subscription_service.dart';
+import 'package:guarda_corpo_2024/providers/providers.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/screens/tela_configuracoes_notificacoes.dart';
+import 'package:guarda_corpo_2024/screens/tela_planos_treino.dart';
+import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -19,6 +21,7 @@ class ProfileScreen extends ConsumerWidget {
     final userDoc =
         FirebaseFirestore.instance.collection('usuarios').doc(userId);
     final isPremium = ref.watch(subscriptionProvider).isPremium(userId);
+    final imageState = ref.watch(profileImageProvider); // ✅ Adicione
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -56,7 +59,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
 
-                  // CARD DO USUÁRIO
+                  // ✅ CARD DO USUÁRIO ATUALIZADO
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Container(
@@ -76,18 +79,37 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       child: Column(
                         children: [
+                          // ✅ Mostra foto do Firebase
                           Container(
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
+                              image: imageState.bytes != null
+                                  ? DecorationImage(
+                                      image: MemoryImage(imageState.bytes!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.white,
-                            ),
+                            child: imageState.isLoading
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      ),
+                                    ),
+                                  )
+                                : imageState.bytes == null
+                                    ? const Icon(Icons.person,
+                                        size: 40, color: Colors.white)
+                                    : null,
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -107,9 +129,7 @@ class ProfileScreen extends ConsumerWidget {
                               final premium = snapshot.data == true;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
+                                    horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: premium
                                       ? Colors.amber.withValues(alpha: 0.2)
@@ -194,11 +214,10 @@ class ProfileScreen extends ConsumerWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '10 Séries Concluídas!',
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
-                                  ),
+                                  Text('10 Séries Concluídas!',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium),
                                   Text(
                                     'Parabéns pela conquista! 💪',
                                     style: Theme.of(context)
@@ -227,16 +246,63 @@ class ProfileScreen extends ConsumerWidget {
 
                   const SizedBox(height: 24),
 
+                  // ✅ NOVA SEÇÃO: FUNCIONALIDADES
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Funcionalidades',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 16),
+
+                        // Planos de Treino
+                        _buildSettingItem(
+                          context,
+                          Icons.calendar_today,
+                          'Planos de Treino',
+                          'Ver e gerir planos semanais',
+                          AppColors.primaryPurple,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TelaPlanosTreino()),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Fotos de Progresso
+                        _buildSettingItem(
+                          context,
+                          Icons.photo_camera,
+                          'Fotos de Progresso',
+                          'Acompanha a tua evolução',
+                          AppColors.primaryGreen,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TelaFotosProgresso()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
                   // CONFIGURAÇÕES
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Configurações',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
+                        Text('Configurações',
+                            style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 16),
 
                         // Notificações
@@ -245,14 +311,13 @@ class ProfileScreen extends ConsumerWidget {
                           Icons.notifications_outlined,
                           'Notificações',
                           'Gerir lembretes de treino',
-                          AppColors.primaryPurple,
+                          AppColors.accentOrange,
                           () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    const TelaConfiguracoesNotificacoes(),
-                              ),
+                                  builder: (_) =>
+                                      const TelaConfiguracoesNotificacoes()),
                             );
                           },
                         ),
@@ -284,10 +349,9 @@ class ProfileScreen extends ConsumerWidget {
                                       Navigator.pushReplacementNamed(
                                           context, '/login');
                                     },
-                                    child: const Text(
-                                      'Sair',
-                                      style: TextStyle(color: AppColors.error),
-                                    ),
+                                    child: const Text('Sair',
+                                        style:
+                                            TextStyle(color: AppColors.error)),
                                   ),
                                 ],
                               ),

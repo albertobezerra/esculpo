@@ -3,7 +3,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
-import 'package:intl/intl.dart';
 
 class GraficoEvolucaoWidget extends StatelessWidget {
   const GraficoEvolucaoWidget({super.key});
@@ -22,9 +21,10 @@ class GraficoEvolucaoWidget extends StatelessWidget {
               descending: false) // Ordem cronológica para o gráfico
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const SizedBox(
               height: 200, child: Center(child: CircularProgressIndicator()));
+        }
 
         final docs = snapshot.data!.docs;
         List<FlSpot> spots = [];
