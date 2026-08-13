@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '../core/theme/app_theme.dart';
+import '../../core/theme/app_theme.dart';
 
 class TelaComparacaoFotos extends StatelessWidget {
   final Map<String, dynamic> fotoAntes;

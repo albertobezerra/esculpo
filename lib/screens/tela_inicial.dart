@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
 import 'package:guarda_corpo_2024/providers/navigation_provider.dart';
-import 'package:guarda_corpo_2024/screens/profile_screen.dart';
+import 'package:guarda_corpo_2024/screens/perfil/profile_screen.dart';
 import 'package:guarda_corpo_2024/widgets/home/tela_inicial_content.dart';
 import 'tela_exercicios.dart';
 import 'tela_historico_treinos.dart';

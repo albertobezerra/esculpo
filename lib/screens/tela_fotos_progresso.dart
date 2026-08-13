@@ -5,8 +5,8 @@ import 'package:guarda_corpo_2024/servicos/foto_progresso_servico.dart';
 import 'package:intl/intl.dart';
 import '../providers/providers.dart';
 import '../core/theme/app_theme.dart';
-import 'tela_adicionar_foto_progresso.dart';
-import 'tela_comparacao_fotos.dart';
+import 'progresso/tela_adicionar_foto_progresso.dart';
+import 'progresso/tela_comparacao_fotos.dart';
 import 'tela_detalhe_foto_progresso.dart';
 import '../widgets/grafico_evolucao_widget.dart';
 

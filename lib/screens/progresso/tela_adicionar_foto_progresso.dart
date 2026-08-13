@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import '../providers/providers.dart';
-import '../core/theme/app_theme.dart';
+import '../../providers/providers.dart';
+import '../../core/theme/app_theme.dart';
 
 class TelaAdicionarFotoProgresso extends ConsumerStatefulWidget {
   const TelaAdicionarFotoProgresso({super.key});
