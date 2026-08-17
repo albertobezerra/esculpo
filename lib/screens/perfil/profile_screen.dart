@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:guarda_corpo_2024/providers/providers.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:guarda_corpo_2024/core/theme/app_theme.dart';
+import 'package:guarda_corpo_2024/core/navigation/app_route_names.dart';
+import 'package:guarda_corpo_2024/providers/navigation_provider.dart';
 import 'package:guarda_corpo_2024/screens/tela_configuracoes_notificacoes.dart';
 import 'package:guarda_corpo_2024/screens/tela_planos_treino.dart';
 import 'package:guarda_corpo_2024/screens/tela_fotos_progresso.dart';
@@ -18,8 +20,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = FirebaseAuth.instance.currentUser!.uid;
     final userEmail = FirebaseAuth.instance.currentUser!.email ?? 'Sem email';
-    final userDoc =
-        FirebaseFirestore.instance.collection('usuarios').doc(userId);
+    final userDoc = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(userId);
     final isPremium = ref.watch(subscriptionProvider).isPremium(userId);
     final imageState = ref.watch(profileImageProvider); // ✅ Adicione
 
@@ -48,12 +51,8 @@ class ProfileScreen extends ConsumerWidget {
                       children: [
                         Text(
                           'Perfil',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -69,7 +68,7 @@ class ProfileScreen extends ConsumerWidget {
                         gradient: const LinearGradient(
                           colors: [
                             AppColors.primaryPurple,
-                            AppColors.primaryGreen
+                            AppColors.primaryGreen,
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -102,21 +101,23 @@ class ProfileScreen extends ConsumerWidget {
                                         strokeWidth: 2,
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
+                                              Colors.white,
+                                            ),
                                       ),
                                     ),
                                   )
                                 : imageState.bytes == null
-                                    ? const Icon(Icons.person,
-                                        size: 40, color: Colors.white)
-                                    : null,
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Colors.white,
+                                  )
+                                : null,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             userEmail,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -129,7 +130,9 @@ class ProfileScreen extends ConsumerWidget {
                               final premium = snapshot.data == true;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: premium
                                       ? Colors.amber.withValues(alpha: 0.2)
@@ -199,8 +202,9 @@ class ProfileScreen extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryGreen
-                                    .withValues(alpha: 0.1),
+                                color: AppColors.primaryGreen.withValues(
+                                  alpha: 0.1,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Icon(
@@ -214,18 +218,16 @@ class ProfileScreen extends ConsumerWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('10 Séries Concluídas!',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium),
                                   Text(
-                                    'Parabéns pela conquista! 💪',
+                                    '10 Séries Concluídas!',
                                     style: Theme.of(context)
                                         .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: AppColors.textGray,
-                                        ),
+                                        .titleMedium,
+                                  ),
+                                  Text(
+                                    'Parabéns pela conquista! 💪',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: AppColors.textGray),
                                   ),
                                 ],
                               ),
@@ -233,10 +235,11 @@ class ProfileScreen extends ConsumerWidget {
                             IconButton(
                               icon: const Icon(Icons.share),
                               onPressed: () {
-                                SharePlus.instance.share(ShareParams(
-                                  text:
-                                      'Conquistei 10 séries no Esculpo! 💪 #EsculpoApp',
-                                ));
+                                SharePlus.instance.share(
+                                  ShareParams(
+                                    text: 'Conquistei 10 séries no Esculpo! 💪 #EsculpoApp',
+                                  ),
+                                );
                               },
                             ),
                           ],
@@ -252,8 +255,10 @@ class ProfileScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Funcionalidades',
-                            style: Theme.of(context).textTheme.titleLarge),
+                        Text(
+                          'Funcionalidades',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 16),
 
                         // Planos de Treino
@@ -267,7 +272,8 @@ class ProfileScreen extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const TelaPlanosTreino()),
+                                builder: (_) => const TelaPlanosTreino(),
+                              ),
                             );
                           },
                         ),
@@ -285,7 +291,8 @@ class ProfileScreen extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const TelaFotosProgresso()),
+                                builder: (_) => const TelaFotosProgresso(),
+                              ),
                             );
                           },
                         ),
@@ -301,8 +308,10 @@ class ProfileScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Configurações',
-                            style: Theme.of(context).textTheme.titleLarge),
+                        Text(
+                          'Configurações',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 16),
 
                         // Notificações
@@ -316,8 +325,9 @@ class ProfileScreen extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
-                                      const TelaConfiguracoesNotificacoes()),
+                                builder: (_) =>
+                                    const TelaConfiguracoesNotificacoes(),
+                              ),
                             );
                           },
                         ),
@@ -336,22 +346,35 @@ class ProfileScreen extends ConsumerWidget {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: const Text('Sair'),
-                                content:
-                                    const Text('Tens certeza que queres sair?'),
+                                content: const Text(
+                                  'Tens certeza que queres sair?',
+                                ),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(context),
                                     child: const Text('Cancelar'),
                                   ),
                                   TextButton(
-                                    onPressed: () {
-                                      FirebaseAuth.instance.signOut();
-                                      Navigator.pushReplacementNamed(
-                                          context, '/login');
+                                    onPressed: () async {
+                                      ref
+                                              .read(
+                                                selectedIndexProvider.notifier,
+                                              )
+                                              .state =
+                                          0;
+                                      await FirebaseAuth.instance.signOut();
+                                      if (context.mounted) {
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          AppRoutes.auth,
+                                          (_) => false,
+                                        );
+                                      }
                                     },
-                                    child: const Text('Sair',
-                                        style:
-                                            TextStyle(color: AppColors.error)),
+                                    child: const Text(
+                                      'Sair',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -399,16 +422,14 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(context).textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textGray,
-                ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.textGray),
           ),
         ],
       ),
@@ -447,15 +468,11 @@ class ProfileScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textGray,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.textGray),
                   ),
                 ],
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Adiciona o Firestore
 import 'package:google_fonts/google_fonts.dart';
+import 'package:guarda_corpo_2024/core/navigation/app_route_names.dart';
+import 'package:guarda_corpo_2024/features/auth/data/auth_repository.dart';
 
 class TelaLogin extends StatefulWidget {
   const TelaLogin({super.key});
@@ -14,7 +14,9 @@ class _TelaLoginState extends State<TelaLogin> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authRepository = AuthRepository();
   bool _isLoading = false;
+  bool _isRegisterMode = false;
 
   @override
   void dispose() {
@@ -30,79 +32,32 @@ class _TelaLoginState extends State<TelaLogin> {
       _isLoading = true;
     });
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
-      // Tenta fazer login
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-    } on FirebaseAuthException catch (e) {
-      // Se falhar o login, tenta criar uma conta em mais cenários
-      if (e.code == 'user-not-found' ||
-          e.code == 'wrong-password' ||
-          e.code == 'invalid-credential') {
-        try {
-          // Cria a conta no Firebase Authentication
-          UserCredential userCredential =
-              await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-
-          // Cria um documento inicial no Firestore pra esse usuário
-          String userId = userCredential.user!.uid;
-          await FirebaseFirestore.instance
-              .collection('usuarios')
-              .doc(userId)
-              .set({
-            'email': _emailController.text.trim(),
-            'createdAt': Timestamp.now(),
-            // Campos iniciais (podem ser expandidos conforme necessário)
-          }, SetOptions(merge: true));
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Conta criada com sucesso!')),
-            );
-          }
-        } on FirebaseAuthException catch (createError) {
-          String message;
-          if (createError.code == 'email-already-in-use') {
-            message = 'Este email já está em uso. Tente redefinir sua senha.';
-          } else if (createError.code == 'invalid-email') {
-            message = 'Email inválido. Por favor, verifique o email inserido.';
-          } else if (createError.code == 'weak-password') {
-            message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
-          } else {
-            message = 'Erro ao criar conta: ${createError.message}';
-          }
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(message)),
-            );
-          }
-        }
+      if (_isRegisterMode) {
+        await _authRepository.createAccount(email: email, password: password);
       } else {
-        // Outros erros de login
-        String message;
-        if (e.code == 'invalid-email') {
-          message = 'Email inválido. Por favor, verifique o email inserido.';
-        } else if (e.code == 'too-many-requests') {
-          message = 'Muitas tentativas. Tente novamente mais tarde.';
-        } else {
-          message = 'Erro ao fazer login: ${e.message}';
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
-        }
+        await _authRepository.signIn(email: email, password: password);
+      }
+
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.auth,
+          (_) => false,
+        );
+      }
+    } on AuthFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_messageFor(error))));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro inesperado: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro inesperado: $e')));
       }
     } finally {
       if (mounted) {
@@ -117,44 +72,51 @@ class _TelaLoginState extends State<TelaLogin> {
     if (_emailController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Por favor, insira seu email para redefinir a senha')),
+          content: Text('Por favor, insira seu email para redefinir a senha'),
+        ),
       );
       return;
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
+      await _authRepository.sendPasswordReset(_emailController.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text(
-                  'Email de redefinição de senha enviado! Verifique sua caixa de entrada.')),
+            content: Text(
+              'Email de redefinição de senha enviado! Verifique sua caixa de entrada.',
+            ),
+          ),
         );
       }
-    } on FirebaseAuthException catch (e) {
-      String message;
-      if (e.code == 'invalid-email') {
-        message = 'Email inválido. Por favor, verifique o email inserido.';
-      } else if (e.code == 'user-not-found') {
-        message = 'Nenhum usuário encontrado com este email.';
-      } else {
-        message = 'Erro ao enviar email de redefinição: ${e.message}';
-      }
+    } on AuthFailure catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_messageFor(error))));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     }
+  }
+
+  String _messageFor(AuthFailure failure) {
+    return switch (failure.code) {
+      'invalid-email' => 'Email inválido. Verifique o endereço informado.',
+      'invalid-credential' || 'wrong-password' => 'Email ou senha incorretos.',
+      'user-not-found' => 'Nenhuma conta encontrada com este email.',
+      'email-already-in-use' => 'Este email já possui uma conta.',
+      'weak-password' => 'Use uma senha com pelo menos 6 caracteres.',
+      'too-many-requests' =>
+        'Muitas tentativas. Aguarde um pouco e tente novamente.',
+      'network-request-failed' =>
+        'Sem conexão. Verifique sua internet e tente novamente.',
+      'profile-write-failed' =>
+        'A conta foi criada, mas o perfil não pôde ser preparado.',
+      _ => failure.details ?? 'Não foi possível concluir a operação.',
+    };
   }
 
   @override
@@ -162,15 +124,12 @@ class _TelaLoginState extends State<TelaLogin> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Impede redimensionamento pelo teclado
+      resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
           // Imagem de fundo
-          Image.asset(
-            'assets/images/back_login.jpg',
-            fit: BoxFit.cover,
-          ),
+          Image.asset('assets/images/back_login.jpg', fit: BoxFit.cover),
           // Título fixo no topo
           Positioned(
             top: 0,
@@ -225,7 +184,7 @@ class _TelaLoginState extends State<TelaLogin> {
                   SizedBox(height: screenHeight * 0.02),
                   // Título unificado
                   Text(
-                    'LOGIN/CADASTRO',
+                    _isRegisterMode ? 'CRIAR CONTA' : 'ENTRAR',
                     style: GoogleFonts.bebasNeue(
                       fontSize: 32,
                       color: Colors.white,
@@ -255,8 +214,9 @@ class _TelaLoginState extends State<TelaLogin> {
                               decoration: InputDecoration(
                                 labelText: 'EMAIL',
                                 labelStyle: GoogleFonts.bebasNeue(
-                                  color:
-                                      const Color(0xFFF5F5F0), // Branco Creme
+                                  color: const Color(
+                                    0xFFF5F5F0,
+                                  ), // Branco Creme
                                   fontSize: 18,
                                 ),
                                 enabledBorder: OutlineInputBorder(
@@ -278,7 +238,8 @@ class _TelaLoginState extends State<TelaLogin> {
                                     Colors.transparent, // Fundo transparente
                               ),
                               style: const TextStyle(
-                                  color: Color(0xFFF5F5F0)), // Texto branco
+                                color: Color(0xFFF5F5F0),
+                              ), // Texto branco
                               keyboardType: TextInputType.emailAddress,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -307,8 +268,9 @@ class _TelaLoginState extends State<TelaLogin> {
                               decoration: InputDecoration(
                                 labelText: 'SENHA',
                                 labelStyle: GoogleFonts.bebasNeue(
-                                  color:
-                                      const Color(0xFFF5F5F0), // Branco Creme
+                                  color: const Color(
+                                    0xFFF5F5F0,
+                                  ), // Branco Creme
                                   fontSize: 18,
                                 ),
                                 enabledBorder: OutlineInputBorder(
@@ -330,7 +292,8 @@ class _TelaLoginState extends State<TelaLogin> {
                                     Colors.transparent, // Fundo transparente
                               ),
                               style: const TextStyle(
-                                  color: Color(0xFFF5F5F0)), // Texto branco
+                                color: Color(0xFFF5F5F0),
+                              ), // Texto branco
                               obscureText: true,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -344,37 +307,52 @@ class _TelaLoginState extends State<TelaLogin> {
                             ),
                           ),
                           SizedBox(height: screenHeight * 0.03),
-                          _isLoading
-                              ? const CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFFE07A5F)),
-                                )
-                              : GestureDetector(
-                                  onTap: _submit,
-                                  child: const SizedBox(
-                                    width: 60,
-                                    height: 60,
-                                    child: Icon(
-                                      Icons.arrow_circle_right_outlined,
-                                      color: Color(0xFFF5F5F0),
-                                      size: 70,
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _isLoading ? null : _submit,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      _isRegisterMode
+                                          ? 'CRIAR MINHA CONTA'
+                                          : 'ENTRAR',
                                     ),
-                                  ),
-                                ),
-                          SizedBox(height: screenHeight * 0.04),
-                          TextButton(
-                            onPressed: _resetPassword,
-                            child: Text(
-                              'ESQUECI A SENHA',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: const Color(0xFFF5F5F0),
-                                    fontSize: 16,
-                                  ),
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => setState(
+                                    () => _isRegisterMode = !_isRegisterMode,
+                                  ),
+                            child: Text(
+                              _isRegisterMode
+                                  ? 'JÁ TENHO CONTA'
+                                  : 'QUERO CRIAR UMA CONTA',
+                              style: const TextStyle(color: Color(0xFFF5F5F0)),
+                            ),
+                          ),
+                          if (!_isRegisterMode)
+                            TextButton(
+                              onPressed: _isLoading ? null : _resetPassword,
+                              child: Text(
+                                'ESQUECI A SENHA',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: const Color(0xFFF5F5F0),
+                                      fontSize: 16,
+                                    ),
+                              ),
+                            ),
                         ],
                       ),
                     ),

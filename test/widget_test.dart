@@ -1,30 +1,34 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:guarda_corpo_2024/main.dart';
+import 'package:guarda_corpo_2024/features/onboarding/domain/onboarding_profile.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  final profile = OnboardingProfile(
+    name: 'Pessoa Teste',
+    birthDate: DateTime(1995, 1, 10),
+    gender: 'Outro',
+    weight: 80,
+    height: 180,
+    goalWeight: 75,
+    objective: 'Ganhar massa',
+    experience: 'Sim, <6 meses',
+    weeklyFrequency: 3,
+    activityLevel: 'Moderado',
+    equipment: 'Academia',
+    preference: 'Musculação',
+    schedule: 'Manhã',
+    restrictions: 'Não',
+  );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('calcula IMC com altura informada em centímetros', () {
+    expect(profile.bmi, closeTo(24.69, 0.01));
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('mantém as chaves usadas pelo gerador legado', () {
+    final data = profile.toLegacyMap();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(data['objetivo'], 'Ganhar massa');
+    expect(data['frequencia'], 3);
+    expect(data['onboardingConcluido'], isTrue);
+    expect(data['schemaVersion'], 2);
   });
 }

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:guarda_corpo_2024/core/navigation/app_route_names.dart';
+import 'package:guarda_corpo_2024/features/onboarding/data/onboarding_repository.dart';
+import 'package:guarda_corpo_2024/features/onboarding/domain/onboarding_profile.dart';
 import 'package:intl/intl.dart';
-
-// Importando a tela inicial
-import 'tela_inicial.dart';
 
 class TelaOnboarding extends StatefulWidget {
   const TelaOnboarding({super.key});
@@ -20,6 +19,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightGoalController = TextEditingController();
+  final _onboardingRepository = OnboardingRepository();
   DateTime? _birthDate;
   String? _gender;
   double? _weight;
@@ -53,8 +53,10 @@ class _TelaOnboardingState extends State<TelaOnboarding>
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
-    _textAnimation =
-        Tween<double>(begin: 0.0, end: 0.5).animate(_textAnimationController);
+    _textAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.5,
+    ).animate(_textAnimationController);
   }
 
   @override
@@ -124,47 +126,41 @@ class _TelaOnboardingState extends State<TelaOnboarding>
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        debugPrint('Iniciando salvamento no Firebase...');
-        await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(user.uid)
-            .collection('onboarding')
-            .doc('data')
-            .set({
-          'nome': _nameController.text.trim(),
-          'dataNascimento': _birthDate,
-          'genero': _gender,
-          'peso': _weight,
-          'altura': _height,
-          'metaPeso': _weightGoal,
-          'objetivo': _objective,
-          'experiencia': _experience,
-          'frequencia': _frequency,
-          'nivelAtividade': _activityLevel,
-          'equipamento': _equipment,
-          'preferencia': _preference,
-          'horario': _schedule,
-          'restricoes': _restrictions,
-          'onboardingConcluido': true,
-        }, SetOptions(merge: true));
-        debugPrint('Salvamento no Firebase concluído.');
+        final profile = OnboardingProfile(
+          name: _nameController.text.trim(),
+          birthDate: _birthDate!,
+          gender: _gender!,
+          weight: _weight!,
+          height: _height!,
+          goalWeight: _weightGoal!,
+          objective: _objective!,
+          experience: _experience!,
+          weeklyFrequency: _frequency!,
+          activityLevel: _activityLevel!,
+          equipment: _equipment!,
+          preference: _preference!,
+          schedule: _schedule!,
+          restrictions: _restrictions!,
+        );
+
+        await _onboardingRepository.save(userId: user.uid, profile: profile);
 
         await user.updateDisplayName(_nameController.text.trim());
 
         if (mounted) {
-          debugPrint('Navegando para TelaInicial...');
-          Navigator.pushReplacement(
+          Navigator.pushNamedAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const TelaInicial()),
+            AppRoutes.home,
+            (_) => false,
           );
-          debugPrint('Navegação concluída.');
         }
       } catch (e) {
         debugPrint('Erro ao salvar no Firebase ou navegar: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Erro ao salvar ou navegar. Tente novamente.')),
+              content: Text('Erro ao salvar ou navegar. Tente novamente.'),
+            ),
           );
         }
       } finally {
@@ -189,8 +185,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                   LinearProgressIndicator(
                     value: (_currentPage + 1) / 15,
                     backgroundColor: const Color.fromRGBO(255, 255, 255, 0.3),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Color(0xFFF5F5F0)),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFFF5F5F0),
+                    ),
                     minHeight: 4.0,
                   ),
                   Expanded(
@@ -210,7 +207,8 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                 alignment: Alignment.center,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 24.0),
+                                    horizontal: 24.0,
+                                  ),
                                   child: Text(
                                     'Para tornar sua jornada mais personalizada e proveitosa, pedimos que responda todas as perguntas a seguir com carinho. Vamos construir algo especial juntos! 😊',
                                     style: GoogleFonts.bebasNeue(
@@ -231,8 +229,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                           ? _textAnimation.value
                                           : 0.0,
                                       child: Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 20.0),
+                                        padding: const EdgeInsets.only(
+                                          bottom: 20.0,
+                                        ),
                                         child: Text(
                                           'Deslize para continuar',
                                           style: GoogleFonts.bebasNeue(
@@ -254,8 +253,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                           child: Form(
                             key: _nameFormKey,
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24.0,
+                              ),
                               child: TextFormField(
                                 controller: _nameController,
                                 textCapitalization: TextCapitalization.words,
@@ -282,8 +282,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                   filled: true,
                                   fillColor: Colors.transparent,
                                 ),
-                                style:
-                                    const TextStyle(color: Color(0xFFF5F5F0)),
+                                style: const TextStyle(
+                                  color: Color(0xFFF5F5F0),
+                                ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Por favor, digite seu nome';
@@ -305,8 +306,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Sua Data de Nascimento?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: ElevatedButton(
                               onPressed: () async {
                                 final pickedDate = await showDatePicker(
@@ -337,7 +339,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                 _birthDate == null
                                     ? 'Selecionar Data'
                                     : DateFormat('dd/MM/yyyy')
-                                        .format(_birthDate!),
+                                          .format(_birthDate!),
                                 style: GoogleFonts.bebasNeue(
                                   fontSize: 18,
                                   color: const Color(0xFFF5F5F0),
@@ -350,8 +352,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual é Seu Gênero?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _gender,
                               hint: Text(
@@ -365,31 +368,47 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Masculino',
-                                    child: Text('Masculino',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Masculino',
+                                  child: Text(
+                                    'Masculino',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Feminino',
-                                    child: Text('Feminino',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Feminino',
+                                  child: Text(
+                                    'Feminino',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Não binário',
-                                    child: Text('Não binário',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Não binário',
+                                  child: Text(
+                                    'Não binário',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Outro',
-                                    child: Text('Outro',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Outro',
+                                  child: Text(
+                                    'Outro',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Prefiro não dizer',
-                                    child: Text('Prefiro não dizer',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Prefiro não dizer',
+                                  child: Text(
+                                    'Prefiro não dizer',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -410,8 +429,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                           child: Form(
                             key: _weightFormKey,
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24.0,
+                              ),
                               child: TextFormField(
                                 controller: _weightController,
                                 textCapitalization: TextCapitalization.words,
@@ -438,8 +458,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                   filled: true,
                                   fillColor: Colors.transparent,
                                 ),
-                                style:
-                                    const TextStyle(color: Color(0xFFF5F5F0)),
+                                style: const TextStyle(
+                                  color: Color(0xFFF5F5F0),
+                                ),
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -465,8 +486,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                           child: Form(
                             key: _heightFormKey,
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24.0,
+                              ),
                               child: TextFormField(
                                 controller: _heightController,
                                 textCapitalization: TextCapitalization.words,
@@ -493,8 +515,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                   filled: true,
                                   fillColor: Colors.transparent,
                                 ),
-                                style:
-                                    const TextStyle(color: Color(0xFFF5F5F0)),
+                                style: const TextStyle(
+                                  color: Color(0xFFF5F5F0),
+                                ),
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -520,8 +543,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                           child: Form(
                             key: _weightGoalFormKey,
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24.0,
+                              ),
                               child: TextFormField(
                                 controller: _weightGoalController,
                                 textCapitalization: TextCapitalization.words,
@@ -548,8 +572,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                                   filled: true,
                                   fillColor: Colors.transparent,
                                 ),
-                                style:
-                                    const TextStyle(color: Color(0xFFF5F5F0)),
+                                style: const TextStyle(
+                                  color: Color(0xFFF5F5F0),
+                                ),
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -574,8 +599,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Seu Objetivo?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _objective,
                               hint: Text(
@@ -589,19 +615,26 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Perder peso',
-                                    child: Text('Perder peso',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Perder peso',
+                                  child: Text(
+                                    'Perder peso',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Ganhar massa',
-                                    child: Text('Ganhar massa',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Ganhar massa',
+                                  child: Text(
+                                    'Ganhar massa',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -620,8 +653,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Você Já Tem Experiência com Treinos?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _experience,
                               hint: Text(
@@ -635,29 +669,40 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Sim, regularmente',
-                                    child: Text('Sim, treino regularmente',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Sim, regularmente',
+                                  child: Text(
+                                    'Sim, treino regularmente',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Sim, >6 meses',
-                                    child: Text(
-                                        'Sim, treino a mais de seis meses',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Sim, >6 meses',
+                                  child: Text(
+                                    'Sim, treino a mais de seis meses',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Sim, <6 meses',
-                                    child: Text(
-                                        'Sim, treino a menos de seis meses',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Sim, <6 meses',
+                                  child: Text(
+                                    'Sim, treino a menos de seis meses',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Não',
-                                    child: Text('Não tenho experiência',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Não',
+                                  child: Text(
+                                    'Não tenho experiência',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -676,8 +721,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Com Qual Frequência Deseja Treinar?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<int>(
                               value: _frequency,
                               hint: Text(
@@ -691,39 +737,61 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 1,
-                                    child: Text('1 dia na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 1,
+                                  child: Text(
+                                    '1 dia na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 2,
-                                    child: Text('2 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 2,
+                                  child: Text(
+                                    '2 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 3,
-                                    child: Text('3 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 3,
+                                  child: Text(
+                                    '3 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 4,
-                                    child: Text('4 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 4,
+                                  child: Text(
+                                    '4 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 5,
-                                    child: Text('5 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 5,
+                                  child: Text(
+                                    '5 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 6,
-                                    child: Text('6 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 6,
+                                  child: Text(
+                                    '6 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 7,
-                                    child: Text('7 dias na semana',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 7,
+                                  child: Text(
+                                    '7 dias na semana',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -742,8 +810,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Seu Nível de Atividade Diária?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _activityLevel,
                               hint: Text(
@@ -757,27 +826,40 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Sedentário',
-                                    child: Text('Sedentário',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Sedentário',
+                                  child: Text(
+                                    'Sedentário',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Levemente ativo',
-                                    child: Text('Levemente ativo',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Levemente ativo',
+                                  child: Text(
+                                    'Levemente ativo',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Moderadamente ativo',
-                                    child: Text('Moderadamente ativo',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Moderadamente ativo',
+                                  child: Text(
+                                    'Moderadamente ativo',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Muito ativo',
-                                    child: Text('Muito ativo',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Muito ativo',
+                                  child: Text(
+                                    'Muito ativo',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -796,8 +878,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Equipamento Você Tem?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _equipment,
                               hint: Text(
@@ -811,23 +894,33 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Nenhum',
-                                    child: Text('Nenhum equipamento',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Nenhum',
+                                  child: Text(
+                                    'Nenhum equipamento',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Básico',
-                                    child: Text('Equipamento básico',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Básico',
+                                  child: Text(
+                                    'Equipamento básico',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Academia',
-                                    child: Text('Academia completa',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Academia',
+                                  child: Text(
+                                    'Academia completa',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -846,8 +939,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Sua Preferência?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _preference,
                               hint: Text(
@@ -861,23 +955,33 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Cardio',
-                                    child: Text('Cardio',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Cardio',
+                                  child: Text(
+                                    'Cardio',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Musculação',
-                                    child: Text('Musculação',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Musculação',
+                                  child: Text(
+                                    'Musculação',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Nenhuma',
-                                    child: Text('Não tenho preferência',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Nenhuma',
+                                  child: Text(
+                                    'Não tenho preferência',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -896,8 +1000,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Qual Seu Horário Disponível?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _schedule,
                               hint: Text(
@@ -911,23 +1016,33 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Manhã',
-                                    child: Text('Manhã',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Manhã',
+                                  child: Text(
+                                    'Manhã',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Tarde',
-                                    child: Text('Tarde',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Tarde',
+                                  child: Text(
+                                    'Tarde',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Noite',
-                                    child: Text('Noite',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Noite',
+                                  child: Text(
+                                    'Noite',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -946,8 +1061,9 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                         _buildPage(
                           title: 'Tem Restrições ou Lesões?',
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
                             child: DropdownButton<String>(
                               value: _restrictions,
                               hint: Text(
@@ -961,23 +1077,33 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                               underline: const SizedBox(
                                 height: 2,
                                 child: DecoratedBox(
-                                  decoration:
-                                      BoxDecoration(color: Color(0xFFF5F5F0)),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFFF5F5F0),
+                                  ),
                                 ),
                               ),
                               items: const [
                                 DropdownMenuItem(
-                                    value: 'Não',
-                                    child: Text('Não tenho restrições',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Não',
+                                  child: Text(
+                                    'Não tenho restrições',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Lesões',
-                                    child: Text('Tenho lesões',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Lesões',
+                                  child: Text(
+                                    'Tenho lesões',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                                 DropdownMenuItem(
-                                    value: 'Alimentares',
-                                    child: Text('Restrições alimentares',
-                                        style: TextStyle(color: Colors.black))),
+                                  value: 'Alimentares',
+                                  child: Text(
+                                    'Restrições alimentares',
+                                    style: TextStyle(color: Colors.black),
+                                  ),
+                                ),
                               ],
                               onChanged: (value) {
                                 setState(() {
@@ -1004,56 +1130,101 @@ class _TelaOnboardingState extends State<TelaOnboarding>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Nome: ${_nameController.text.trim()}',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
                                 Text(
-                                    'Data de Nascimento: ${_birthDate != null ? DateFormat('dd/MM/yyyy').format(_birthDate!) : ''}',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Gênero: $_gender',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Peso: $_weight kg',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Altura: $_height cm',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Meta de Peso: $_weightGoal kg',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Objetivo: $_objective',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Experiência: $_experience',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Frequência: $_frequency dias/semana',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Nível de Atividade: $_activityLevel',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Equipamento: $_equipment',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Preferência: $_preference',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Horário: $_schedule',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
-                                Text('Restrições: $_restrictions',
-                                    style: GoogleFonts.bebasNeue(
-                                        color: Colors.white)),
+                                  'Nome: ${_nameController.text.trim()}',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Data de Nascimento: ${_birthDate != null ? DateFormat('dd/MM/yyyy').format(_birthDate!) : ''}',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Gênero: $_gender',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Peso: $_weight kg',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Altura: $_height cm',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Meta de Peso: $_weightGoal kg',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Objetivo: $_objective',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Experiência: $_experience',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Frequência: $_frequency dias/semana',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Nível de Atividade: $_activityLevel',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Equipamento: $_equipment',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Preferência: $_preference',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Horário: $_schedule',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Restrições: $_restrictions',
+                                  style: GoogleFonts.bebasNeue(
+                                    color: Colors.white,
+                                  ),
+                                ),
                                 const SizedBox(height: 20),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 24.0),
+                                    horizontal: 24.0,
+                                  ),
                                   child: IconButton(
-                                    icon: const Icon(Icons.check,
-                                        color: Color(0xFFF5F5F0), size: 40),
+                                    icon: const Icon(
+                                      Icons.check,
+                                      color: Color(0xFFF5F5F0),
+                                      size: 40,
+                                    ),
                                     onPressed: _confirmAndSubmit,
                                   ),
                                 ),
@@ -1090,10 +1261,7 @@ class _TelaOnboardingState extends State<TelaOnboarding>
         children: [
           Text(
             title,
-            style: GoogleFonts.bebasNeue(
-              fontSize: 32,
-              color: Colors.white,
-            ),
+            style: GoogleFonts.bebasNeue(fontSize: 32, color: Colors.white),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
